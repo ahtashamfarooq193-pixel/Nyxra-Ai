@@ -1,0 +1,45 @@
+name: my_chatgpt
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.3
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.1.0
+  http: ^1.2.0
+  flutter_dotenv: ^5.1.0
+  shared_preferences: ^2.2.2
+  image_picker: ^1.0.7
+  permission_handler: ^11.3.0
+  firebase_core: ^3.11.0
+  firebase_auth: ^5.5.0
+  google_sign_in: ^6.2.1
+  cloud_firestore: ^5.6.0
+  flutter_tts: ^4.2.5
+  speech_to_text: ^7.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/splash_background.png
+    - assets/images/Icon.png
+    - assets/images/google_logo.png
+    - .env
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/Icon.png"
+  min_sdk_android: 21
