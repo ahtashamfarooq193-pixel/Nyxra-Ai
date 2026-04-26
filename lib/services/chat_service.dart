@@ -15,7 +15,7 @@ class ChatService {
       'Maintain a helpful, concise, and professional tone. '
       'Respond primarily in Roman Urdu and English as per the user preference.';
 
-  late final String _apiKey;
+  late final List<String> _groqKeys;
   late final String _baseUrl;
   late final String _model;
   
@@ -31,13 +31,16 @@ class ChatService {
   final String _mistralModel = 'open-mistral-7b';
 
   bool _isInitialized = false;
+  int _currentGroqKeyIndex = 0;
 
   ChatService() {
     _initializeConfig();
   }
 
   void _initializeConfig() {
-    _apiKey = (dotenv.env['GROQ_API_KEY'] ?? '').trim();
+    final keysString = dotenv.env['GROQ_API_KEYS'] ?? '';
+    _groqKeys = keysString.split(',').map((k) => k.trim()).where((k) => k.isNotEmpty).toList();
+    
     _baseUrl = (dotenv.env['GROQ_BASE_URL'] ?? 'https://api.groq.com/openai/v1').trim();
     _model = (dotenv.env['GROQ_MODEL'] ?? 'llama-3.3-70b-versatile').trim();
 
@@ -48,12 +51,12 @@ class ChatService {
     
     _mistralKey = (dotenv.env['MISTRAL_API_KEY'] ?? '').trim();
 
-    if (_apiKey.isEmpty) {
-      print('⚠️ ChatService: Groq API Key is missing.');
+    if (_groqKeys.isEmpty) {
+      print('⚠️ ChatService: No Groq API Keys found.');
     }
 
     _isInitialized = true;
-    print('✅ ChatService: Initialized with Groq, Mistral & Cloudflare Fallback');
+    print('✅ ChatService: Initialized with ${_groqKeys.length} Groq Keys & Multi-Provider Fallback');
   }
 
   Stream<String> getAIResponseStream(
@@ -61,52 +64,58 @@ class ChatService {
     List<Message> conversationHistory, {
     String? imagePath,
   }) async* {
-    int currentAttempt = 0; // 0: Groq, 1: Mistral, 2: Cloudflare
     bool hasYieldedContent = false;
 
-    while (currentAttempt < 3) {
-      try {
-        if (currentAttempt == 0) {
-          // Try Groq
-          bool rateLimited = false;
-          await for (final chunk in _callGroq(userMessage, conversationHistory, imagePath: imagePath)) {
-            if (chunk == 'Rate Limit') {
-              rateLimited = true;
-              break;
-            }
-            yield chunk;
-            hasYieldedContent = true;
-          }
-          // If it succeeded or yielded something before breaking, we stop here
-          if (!rateLimited || hasYieldedContent) return;
-        } 
-        else if (currentAttempt == 1) {
-          // Fallback to Mistral (Only if nothing has been sent to user yet)
-          if (hasYieldedContent) return;
-          
-          print('🔄 ChatService: Silent fallback to Mistral AI...');
-          await for (final chunk in _callMistral(userMessage, conversationHistory)) {
-            yield chunk;
-            hasYieldedContent = true;
-          }
-          return;
-        } 
-        else if (currentAttempt == 2) {
-          // Fallback to Cloudflare (Only if nothing has been sent to user yet)
-          if (hasYieldedContent) return;
+    // 1. Try Groq Keys Rotation
+    for (int i = 0; i < _groqKeys.length; i++) {
+      int keyIndex = (_currentGroqKeyIndex + i) % _groqKeys.length;
+      bool rateLimited = false;
 
-          print('🔄 ChatService: Silent fallback to Cloudflare...');
-          await for (final chunk in _callCloudflare(userMessage, conversationHistory)) {
-            yield chunk;
-            hasYieldedContent = true;
+      try {
+        await for (final chunk in _callGroq(userMessage, conversationHistory, _groqKeys[keyIndex], imagePath: imagePath)) {
+          if (chunk == 'Rate Limit') {
+            rateLimited = true;
+            break;
           }
+          yield chunk;
+          hasYieldedContent = true;
+        }
+        
+        if (!rateLimited) {
+          _currentGroqKeyIndex = keyIndex; // Remember successful key
           return;
         }
+        if (hasYieldedContent) return; // If we already started, don't restart with new key
       } catch (e) {
-        print('⚠️ ChatService: Attempt $currentAttempt failed: $e');
-        if (hasYieldedContent) return; // Don't try fallback if we already started responding
+        print('⚠️ Groq Key $keyIndex failed: $e');
       }
-      currentAttempt++;
+    }
+
+    // 2. Fallback to Mistral
+    if (!hasYieldedContent) {
+      try {
+        print('🔄 ChatService: All Groq keys failed. Switching to Mistral AI...');
+        await for (final chunk in _callMistral(userMessage, conversationHistory)) {
+          yield chunk;
+          hasYieldedContent = true;
+        }
+        if (hasYieldedContent) return;
+      } catch (e) {
+        print('⚠️ Mistral failed: $e');
+      }
+    }
+
+    // 3. Fallback to Cloudflare
+    if (!hasYieldedContent) {
+      try {
+        print('🔄 ChatService: Switching to Cloudflare backup...');
+        await for (final chunk in _callCloudflare(userMessage, conversationHistory)) {
+          yield chunk;
+          hasYieldedContent = true;
+        }
+      } catch (e) {
+        print('⚠️ Cloudflare failed: $e');
+      }
     }
 
     if (!hasYieldedContent) {
@@ -160,7 +169,7 @@ class ChatService {
     }
   }
 
-  Stream<String> _callGroq(String userMessage, List<Message> history, {String? imagePath}) async* {
+  Stream<String> _callGroq(String userMessage, List<Message> history, String apiKey, {String? imagePath}) async* {
     final client = http.Client();
     try {
       final messages = _buildMessages(userMessage, history, imagePath: imagePath);
@@ -169,7 +178,7 @@ class ChatService {
       final request = http.Request('POST', Uri.parse('$_baseUrl/chat/completions'));
       request.headers.addAll({
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_apiKey',
+        'Authorization': 'Bearer $apiKey',
       });
 
       request.body = jsonEncode({
