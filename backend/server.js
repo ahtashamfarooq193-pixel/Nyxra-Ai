@@ -220,6 +220,10 @@ app.post("/api/chat", async (req, res) => {
 });
 
 const port = Number(process.env.PORT || 8080);
-app.listen(port, () => {
-  console.log(`Nyxra backend running on port ${port}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(port, () => {
+    console.log(`Nyxra backend running on port ${port}`);
+  });
+}
+
+module.exports = app;
