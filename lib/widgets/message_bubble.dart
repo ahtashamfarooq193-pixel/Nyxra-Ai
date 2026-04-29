@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/message.dart';
@@ -60,11 +60,17 @@ class MessageBubble extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 8),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          File(message.imagePath!),
-                          height: 150,
-                          fit: BoxFit.cover,
-                        ),
+                        child: kIsWeb 
+                            ? Image.network(
+                                message.imagePath!,
+                                height: 150,
+                                fit: BoxFit.cover,
+                              )
+                            : Image.network( // Placeholder for mobile if file path is used, actually better to use network since mobile also uses picker which returns paths
+                                message.imagePath!,
+                                height: 150,
+                                fit: BoxFit.cover,
+                              ),
                       ),
                     ),
                   Text(

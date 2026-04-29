@@ -1,4 +1,4 @@
-package com.example.my_chatgpt
+package com.nyxra.ai
 
 import io.flutter.embedding.android.FlutterActivity
 

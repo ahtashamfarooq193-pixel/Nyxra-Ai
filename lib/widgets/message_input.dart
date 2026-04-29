@@ -1,12 +1,15 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../utils/constants.dart';
+import 'dart:io' as io;
 
 class MessageInput extends StatefulWidget {
-  final Function(String, String?) onSendMessage;
+  final Function(String, String?, Uint8List?, bool) onSendMessage;
   final FocusNode? focusNode;
 
   const MessageInput({
@@ -22,18 +25,61 @@ class MessageInput extends StatefulWidget {
 class _MessageInputState extends State<MessageInput> {
   final TextEditingController _controller = TextEditingController();
   final ImagePicker _picker = ImagePicker();
+  final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isTyping = false;
-  File? _pickedImage;
+  bool _isListening = false;
+  XFile? _pickedXFile;
+
+  late FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = widget.focusNode ?? FocusNode();
+    
+    // Add listener to controller for ultimate Enter-to-send detection
+    _controller.addListener(_onControllerChanged);
+    
+    _initSpeech();
+  }
+
+  void _onControllerChanged() {
+    final text = _controller.text;
+    if (text.endsWith('\n')) {
+      final bool isShiftPressed = HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftLeft) || 
+                                  HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftRight);
+      
+      if (!isShiftPressed && (kIsWeb || (Theme.of(context).platform != TargetPlatform.android && Theme.of(context).platform != TargetPlatform.iOS))) {
+        // Remove the newline and send
+        _controller.text = text.substring(0, text.length - 1);
+        _handleSend();
+      }
+    }
+  }
+
+  void _initSpeech() async {
+    try {
+      await _speech.initialize();
+      setState(() {});
+    } catch (e) {
+      print('Speech initialization error: $e');
+    }
+  }
 
   @override
   void dispose() {
+    _controller.removeListener(_onControllerChanged);
     _controller.dispose();
+    if (widget.focusNode == null) {
+      _focusNode.dispose();
+    }
     super.dispose();
   }
 
   Future<void> _pickImage() async {
     try {
-      if (Platform.isAndroid) {
+      if (!kIsWeb) {
+        // Permission handling for mobile
         var status = await Permission.photos.request();
         if (status.isDenied || status.isPermanentlyDenied) {
           status = await Permission.storage.request();
@@ -47,7 +93,7 @@ class _MessageInputState extends State<MessageInput> {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
         setState(() {
-          _pickedImage = File(image.path);
+          _pickedXFile = image;
         });
       }
     } catch (e) {
@@ -57,19 +103,69 @@ class _MessageInputState extends State<MessageInput> {
 
   void _removeImage() {
     setState(() {
-      _pickedImage = null;
+      _pickedXFile = null;
     });
   }
 
-  void _handleSend() {
+  Future<void> _handleSend({bool isVoiceInput = false}) async {
     final text = _controller.text.trim();
-    if (text.isNotEmpty || _pickedImage != null) {
-      widget.onSendMessage(text, _pickedImage?.path);
+    if (text.isNotEmpty || _pickedXFile != null) {
+      Uint8List? imageBytes;
+      if (_pickedXFile != null) {
+        imageBytes = await _pickedXFile!.readAsBytes();
+      }
+
+      widget.onSendMessage(text, _pickedXFile?.path, imageBytes, isVoiceInput);
       _controller.clear();
       setState(() {
         _isTyping = false;
-        _pickedImage = null;
+        _pickedXFile = null;
       });
+    }
+  }
+
+  void _listen() async {
+    if (!_isListening) {
+      if (!kIsWeb) {
+        // Check microphone permission for mobile
+        var status = await Permission.microphone.status;
+        if (status.isDenied) {
+          status = await Permission.microphone.request();
+          if (status.isDenied) return;
+        }
+        if (status.isPermanentlyDenied) {
+          openAppSettings();
+          return;
+        }
+      }
+
+      bool available = await _speech.initialize(
+        onStatus: (status) {
+          if (status == 'done' || status == 'notListening') {
+            setState(() => _isListening = false);
+          }
+        },
+        onError: (error) => setState(() => _isListening = false),
+      );
+      
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(
+          onResult: (val) {
+            setState(() {
+              _controller.text = val.recognizedWords;
+              _isTyping = _controller.text.isNotEmpty;
+              if (val.finalResult) {
+                _isListening = false;
+                _handleSend(isVoiceInput: true);
+              }
+            });
+          },
+        );
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speech.stop();
     }
   }
 
@@ -95,7 +191,7 @@ class _MessageInputState extends State<MessageInput> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (_pickedImage != null)
+            if (_pickedXFile != null)
               Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(4),
@@ -107,12 +203,19 @@ class _MessageInputState extends State<MessageInput> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        _pickedImage!,
-                        height: 80,
-                        width: 80,
-                        fit: BoxFit.cover,
-                      ),
+                      child: kIsWeb 
+                        ? Image.network(
+                            _pickedXFile!.path,
+                            height: 80,
+                            width: 80,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.file(
+                            io.File(_pickedXFile!.path),
+                            height: 80,
+                            width: 80,
+                            fit: BoxFit.cover,
+                          ),
                     ),
                     Positioned(
                       top: 2,
@@ -158,75 +261,112 @@ class _MessageInputState extends State<MessageInput> {
                       color: Colors.white.withOpacity(0.04),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.06),
+                        color: _isListening 
+                          ? AppConstants.primaryColor.withOpacity(0.5)
+                          : Colors.white.withOpacity(0.06),
                         width: 1,
                       ),
                     ),
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: widget.focusNode,
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                      maxLines: MediaQuery.of(context).orientation == Orientation.landscape ? 2 : 5,
-                      minLines: 1,
-                      decoration: InputDecoration(
-                        hintText: 'Type a message...',
-                        hintStyle: GoogleFonts.inter(
-                          color: Colors.white.withOpacity(0.25),
+                      child: TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
                           fontSize: 14,
                         ),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                        maxLines: null,
+                        minLines: 1,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _handleSend(),
+                        decoration: InputDecoration(
+                          hintText: _isListening ? 'Listening...' : 'Type a message...',
+                          hintStyle: GoogleFonts.inter(
+                            color: _isListening 
+                              ? AppConstants.primaryColor.withOpacity(0.5)
+                              : Colors.white.withOpacity(0.25),
+                            fontSize: 14,
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
+                        onChanged: (value) {
+                          setState(() {
+                            _isTyping = value.trim().isNotEmpty;
+                          });
+                        },
                       ),
-                      onChanged: (value) {
-                        setState(() {
-                          _isTyping = value.trim().isNotEmpty;
-                        });
-                      },
-                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: _handleSend,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: (_isTyping || _pickedImage != null)
-                            ? AppConstants.primaryColor
+                if (!_isTyping && _pickedXFile == null)
+                  GestureDetector(
+                    onTap: _listen,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: _isListening 
+                          ? AppConstants.primaryColor.withOpacity(0.1)
+                          : Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _isListening 
+                            ? AppConstants.primaryColor 
                             : Colors.white.withOpacity(0.1),
-                        width: 1.5,
+                          width: 1.5,
+                        ),
                       ),
-                      boxShadow: (_isTyping || _pickedImage != null) ? [
-                        BoxShadow(
-                          color: AppConstants.primaryColor.withOpacity(0.15),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        )
-                      ] : [],
+                      child: Center(
+                        child: Icon(
+                          _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                          color: _isListening 
+                            ? AppConstants.primaryColor 
+                            : Colors.white.withOpacity(0.4),
+                          size: 22,
+                        ),
+                      ),
                     ),
-                    child: Center(
-                      child: Icon(
-                        Icons.arrow_upward_rounded,
-                        color: (_isTyping || _pickedImage != null)
-                            ? AppConstants.primaryColor
-                            : Colors.white.withOpacity(0.2),
-                        size: 22,
+                  )
+                else
+                  GestureDetector(
+                    onTap: () => _handleSend(),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: (_isTyping || _pickedXFile != null)
+                              ? AppConstants.primaryColor
+                              : Colors.white.withOpacity(0.1),
+                          width: 1.5,
+                        ),
+                        boxShadow: (_isTyping || _pickedXFile != null) ? [
+                          BoxShadow(
+                            color: AppConstants.primaryColor.withOpacity(0.15),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          )
+                        ] : [],
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.arrow_upward_rounded,
+                          color: (_isTyping || _pickedXFile != null)
+                              ? AppConstants.primaryColor
+                              : Colors.white.withOpacity(0.2),
+                          size: 22,
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ],

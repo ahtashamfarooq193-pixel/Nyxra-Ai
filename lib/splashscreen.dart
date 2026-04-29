@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'screens/chat_screen.dart';
 import 'utils/constants.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class Splashscreen extends StatefulWidget {
   const Splashscreen({super.key});
@@ -67,18 +69,28 @@ class _SplashscreenState extends State<Splashscreen> with SingleTickerProviderSt
   }
 
   Future<void> _handleGoogleSignIn() async {
-    print('DEBUG: _handleGoogleSignIn clicked');
     if (_isAuthenticating) return;
     
     setState(() => _isAuthenticating = true);
     
     try {
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        clientId: '1010258908680-qd1deffnn9d1pp48gfik9fg0ejrmr4lo.apps.googleusercontent.com',
-      );
+      if (kIsWeb) {
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        await FirebaseAuth.instance.signInWithPopup(googleProvider);
+        _navigateToChat();
+        return;
+      }
+
+      final GoogleSignIn googleSignIn = GoogleSignIn();
+      
+      // Clean previous sign-in state to avoid stale sessions
+      await googleSignIn.signOut();
+      
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      
       if (googleUser == null) {
-        setState(() => _isAuthenticating = false);
+        // User cancelled the sign-in
+        if (mounted) setState(() => _isAuthenticating = false);
         return;
       }
 
@@ -92,11 +104,23 @@ class _SplashscreenState extends State<Splashscreen> with SingleTickerProviderSt
       
       _navigateToChat();
     } catch (e) {
+      print('SIGN-IN ERROR: $e');
       if (mounted) {
+        String errorMsg = 'Sign in failed. Please try again.';
+        if (e.toString().contains('People API')) {
+          errorMsg = 'Setup incomplete: Please enable People API in Google Console and wait 5 minutes.';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Sign in failed: ${e.toString()}'),
+            content: Text(errorMsg),
             backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _handleGoogleSignIn,
+            ),
           ),
         );
       }
@@ -145,7 +169,7 @@ class _SplashscreenState extends State<Splashscreen> with SingleTickerProviderSt
                   ShaderMask(
                     shaderCallback: (bounds) => AppConstants.primaryGradient.createShader(bounds),
                     child: Text(
-                      'Zenith',
+                      'Nyxra',
                       style: GoogleFonts.poppins(
                         fontSize: 64,
                         fontWeight: FontWeight.bold,
@@ -237,6 +261,33 @@ class _SplashscreenState extends State<Splashscreen> with SingleTickerProviderSt
             letterSpacing: 1.2,
           ),
         ),
+        if (kIsWeb) ...[
+          const SizedBox(height: 60),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final Uri url = Uri.parse('https://drive.google.com/drive/folders/1FJ-Qp_SPkTmXM_zgAkCpbYZrLM5WoXgd');
+              if (await canLaunchUrl(url)) {
+                await launchUrl(url, mode: LaunchMode.externalApplication);
+              }
+            },
+            icon: const Icon(Icons.android, color: Colors.white, size: 18),
+            label: Text(
+              'Download Android App',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: Colors.white.withOpacity(0.3)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

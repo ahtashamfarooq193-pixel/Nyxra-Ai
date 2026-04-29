@@ -11,9 +11,9 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+  cloud_functions: ^5.6.0
   google_fonts: ^6.1.0
   http: ^1.2.0
-  flutter_dotenv: ^5.1.0
   shared_preferences: ^2.2.2
   image_picker: ^1.0.7
   permission_handler: ^11.3.0
@@ -23,6 +23,7 @@ dependencies:
   cloud_firestore: ^5.6.0
   flutter_tts: ^4.2.5
   speech_to_text: ^7.3.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -36,7 +37,6 @@ flutter:
     - assets/splash_background.png
     - assets/images/Icon.png
     - assets/images/google_logo.png
-    - .env
 
 flutter_launcher_icons:
   android: "launcher_icon"
