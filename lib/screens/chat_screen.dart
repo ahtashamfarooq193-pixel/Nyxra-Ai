@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -235,6 +238,9 @@ class _ChatScreenState extends State<ChatScreen> {
       _messages.removeWhere((m) => m.id == id);
     });
     _saveMessages();
+    if (_currentUserUid != null) {
+      _firestoreService.deleteMessage(_currentUserUid!, id);
+    }
     _refreshHistory();
   }
 
@@ -626,7 +632,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     }
                     return MessageBubble(
                       message: _messages[index],
-                      onLongPress: () => _showMessageOptions(_messages[index]),
+                      onCopy: (msg) {
+                        Clipboard.setData(ClipboardData(text: msg.text));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Message copied to clipboard')),
+                        );
+                      },
+                      onEdit: (msg) => _showEditDialog(msg),
+                      onDelete: (msg) => _deleteMessage(msg.id),
                     );
                   },
                 ),

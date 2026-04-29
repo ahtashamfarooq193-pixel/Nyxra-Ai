@@ -9,25 +9,33 @@ import '../utils/constants.dart';
 class MessageBubble extends StatelessWidget {
   final Message message;
   final VoidCallback? onLongPress;
+  final Function(Message)? onEdit;
+  final Function(Message)? onDelete;
+  final Function(Message)? onCopy;
 
   const MessageBubble({
     super.key,
     required this.message,
     this.onLongPress,
+    this.onEdit,
+    this.onDelete,
+    this.onCopy,
   });
 
   @override
   Widget build(BuildContext context) {
     final bool isSending = message.status == MessageStatus.sending;
+    final bool canEdit = message.isUser && 
+        DateTime.now().difference(message.timestamp).inMinutes < 2;
 
-    return GestureDetector(
-      onLongPress: onLongPress,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: Column(
-          crossAxisAlignment: message.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Container(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Column(
+        crossAxisAlignment: message.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onLongPress: () => _showActions(context, canEdit),
+            child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: message.isUser 
@@ -45,15 +53,7 @@ class MessageBubble extends StatelessWidget {
                       : Colors.white.withOpacity(0.08),
                   width: 1,
                 ),
-                boxShadow: message.isUser ? [
-                  BoxShadow(
-                    color: AppConstants.primaryColor.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  )
-                ] : [],
               ),
-
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -69,17 +69,12 @@ class MessageBubble extends StatelessWidget {
                                 width: double.infinity,
                                 fit: BoxFit.cover,
                               )
-                            : (kIsWeb 
-                                ? Image.network(
-                                    message.imagePath!,
-                                    height: 150,
-                                    fit: BoxFit.cover,
-                                  )
-                                : Image.network( 
-                                    message.imagePath!,
-                                    height: 150,
-                                    fit: BoxFit.cover,
-                                  )),
+                            : Image.network(
+                                message.imagePath!,
+                                height: 150,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, color: Colors.white24),
+                              ),
                       ),
                     ),
                   MarkdownBody(
@@ -89,12 +84,7 @@ class MessageBubble extends StatelessWidget {
                         fontSize: 15,
                         color: Colors.white.withOpacity(0.95),
                         height: 1.5,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: 0.2,
                       ),
-                      strong: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-                      em: const TextStyle(fontStyle: FontStyle.italic),
-                      listBullet: const TextStyle(color: Colors.white70),
                       code: GoogleFonts.firaCode(
                         backgroundColor: Colors.black26,
                         fontSize: 13,
@@ -104,25 +94,89 @@ class MessageBubble extends StatelessWidget {
                         color: Colors.black26,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      blockquote: const TextStyle(color: Colors.white60),
-                      blockquoteDecoration: const BoxDecoration(
-                        border: Border(left: BorderSide(color: Colors.white24, width: 4)),
-                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
-              child: Text(
-                (isSending && message.isUser) ? 'Sending...' : _formatTime(message.timestamp),
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  color: Colors.white38,
-                  fontWeight: FontWeight.w400,
+          ),
+          
+          // Action Buttons for Desktop / Quick Access
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!message.isUser) const SizedBox(width: 4),
+                Text(
+                  (isSending && message.isUser) ? 'Sending...' : _formatTime(message.timestamp),
+                  style: GoogleFonts.inter(fontSize: 10, color: Colors.white38),
                 ),
+                const SizedBox(width: 8),
+                if (!isSending) ...[
+                  _buildActionButton(Icons.copy_rounded, () => onCopy?.call(message)),
+                  if (canEdit) _buildActionButton(Icons.edit_rounded, () => onEdit?.call(message)),
+                  _buildActionButton(Icons.delete_outline_rounded, () => onDelete?.call(message), isDelete: true),
+                ],
+                if (message.isUser) const SizedBox(width: 4),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton(IconData icon, VoidCallback onTap, {bool isDelete = false}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Icon(
+          icon,
+          size: 14,
+          color: isDelete ? Colors.redAccent.withOpacity(0.5) : Colors.white24,
+        ),
+      ),
+    );
+  }
+
+  void _showActions(BuildContext context, bool canEdit) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppConstants.surfaceColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.copy_rounded, color: Colors.white),
+              title: const Text('Copy Message', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                onCopy?.call(message);
+              },
+            ),
+            if (canEdit)
+              ListTile(
+                leading: const Icon(Icons.edit_rounded, color: Colors.white),
+                title: const Text('Edit Message', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  onEdit?.call(message);
+                },
               ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+              title: const Text('Delete Permanently', style: TextStyle(color: Colors.redAccent)),
+              onTap: () {
+                Navigator.pop(context);
+                onDelete?.call(message);
+              },
             ),
           ],
         ),

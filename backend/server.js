@@ -11,21 +11,20 @@ app.use(cors());
 app.use(express.json({ limit: "8mb" }));
 
 const SYSTEM_INSTRUCTION =
-  'You are Nyxra AI, a smart and professional AI assistant. ' +
+  'You are Nyxra AI, a highly intelligent, professional, and friendly AI assistant. ' +
+  'LANGUAGE RULE (STRICT):\n' +
+  '- If the user speaks in English, you MUST reply ONLY in English.\n' +
+  '- If the user speaks in Roman Urdu, you MUST reply ONLY in Roman Urdu.\n' +
+  '- DO NOT mix languages unless specifically asked.\n\n' +
   'GREETING RULE:\n' +
-  '- Only greet the user at the very beginning of a conversation or if the user greets you first.\n' +
-  '- If the user says "Assalam-o-Alaikum", "Hello", or "Hi", you MUST respond with a proper greeting.\n' +
-  '- In ongoing conversation, DO NOT start every message with a greeting; just provide the answer directly.\n' +
-  '- Avoid "Namaste". Preferred greetings: "Assalam-o-Alaikum" or "Hello".\n\n' +
+  '- Only greet at the start of a conversation or if the user greets you.\n' +
+  '- Use "Assalam-o-Alaikum" for Roman Urdu users and "Hello/Hi" for English users.\n' +
+  '- In ongoing chat, skip the greeting and answer directly.\n\n' +
   'STRICT TOKEN RULES:\n' +
-  '- Each user has exactly 5000 tokens per day (free daily limit).\n' +
-  '- DO NOT mention token count, usage, or limits in your normal conversation.\n' +
-  '- Only if the user asks, or if you are specifically triggered to show the purchase message, should you talk about tokens.\n' +
-  '- Free limit resets at 12:00 AM. On reset, say: "Aaj ke 5000 free tokens ready hain!"\n\n' +
+  '- Daily limit: 5000 tokens. Do not mention this unless asked.\n\n' +
   'IDENTITY:\n' +
-  'If anyone asks who created you, say you are developed by "Ahtasham", an SE student: https://ahtashamfarooq.netlify.app/\n' +
-  'Maintain a professional tone.\n' +
-  'LANGUAGE RULE: Always reply in the SAME LANGUAGE as the user. If they use English, reply in English. If they use Roman Urdu, reply in Roman Urdu.';
+  '- Developed by "Ahtasham", an SE student: https://ahtashamfarooq.netlify.app/\n' +
+  '- Tone: Professional, helpful, and concise.';
 
 function parseCsv(value) {
   return (value || "")
@@ -267,13 +266,25 @@ app.post("/api/chat", async (req, res) => {
     }
 
     // Check if it's an image generation request
-    if (userMessage.toLowerCase().startsWith("/draw ")) {
-      const prompt = userMessage.substring(6).trim();
-      if (!prompt) return res.status(400).json({ error: "Prompt is required for drawing." });
-      
-      const generatedImageBase64 = await callCloudflareImage(prompt);
+    const lowerMsg = userMessage.toLowerCase();
+    const imageKeywords = ["/draw", "generate image", "create image", "make an image", "draw an image", "generate an image"];
+    
+    let isImageRequest = false;
+    let imagePrompt = "";
+
+    for (const keyword of imageKeywords) {
+      if (lowerMsg.startsWith(keyword)) {
+        isImageRequest = true;
+        imagePrompt = userMessage.substring(keyword.length).trim();
+        if (imagePrompt.startsWith("of ")) imagePrompt = imagePrompt.substring(3).trim();
+        break;
+      }
+    }
+
+    if (isImageRequest && imagePrompt) {
+      const generatedImageBase64 = await callCloudflareImage(imagePrompt);
       return res.json({ 
-        text: `🎨 **Generated Image:** Here is what I created for: "${prompt}"`,
+        text: `🎨 **Generated Image:** Here is what I created for: "${imagePrompt}"`,
         generatedImage: generatedImageBase64 
       });
     }
@@ -283,7 +294,11 @@ app.post("/api/chat", async (req, res) => {
     return res.json({ text });
   } catch (error) {
     console.error("POST /api/chat failed:", error.message);
-    return res.status(500).json({ error: "AI service is temporarily unavailable." });
+    const errorMessage = error.message || "AI service is temporarily unavailable.";
+    return res.status(500).json({ 
+      error: "Server Error", 
+      details: errorMessage.includes("failed") ? "All AI providers are currently busy. Please try again in a few seconds." : errorMessage
+    });
   }
 });
 
