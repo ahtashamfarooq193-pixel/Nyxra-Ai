@@ -21,6 +21,15 @@ class FirestoreService {
     }
   }
 
+  /// Delete a single message from Firestore
+  Future<void> deleteMessage(String userId, String messageId) async {
+    try {
+      await _getUserChatCollection(userId).doc(messageId).delete();
+    } catch (e) {
+      print('Error deleting message from Firestore: $e');
+    }
+  }
+
   /// Load all messages for a user, sorted by timestamp
   Future<List<Message>> loadMessages(String userId) async {
     try {
