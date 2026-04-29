@@ -44,6 +44,15 @@ class ChatService {
 
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       final text = decoded['text']?.toString().trim() ?? '';
+      final generatedImage = decoded['generatedImage'] as String?;
+
+      if (generatedImage != null) {
+        // Special marker for images to be caught by the UI
+        yield text;
+        yield "|||IMG|||$generatedImage";
+        return;
+      }
+
       if (text.isEmpty) {
         yield '❌ **Empty response:** Please try again.';
         return;

@@ -61,17 +61,24 @@ class MessageBubble extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 8),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: kIsWeb 
-                            ? Image.network(
-                                message.imagePath!,
-                                height: 150,
+                        child: message.imagePath!.startsWith('data:image')
+                            ? Image.memory(
+                                base64Decode(message.imagePath!.split(',')[1]),
+                                height: 200,
+                                width: double.infinity,
                                 fit: BoxFit.cover,
                               )
-                            : Image.network( 
-                                message.imagePath!,
-                                height: 150,
-                                fit: BoxFit.cover,
-                              ),
+                            : (kIsWeb 
+                                ? Image.network(
+                                    message.imagePath!,
+                                    height: 150,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.network( 
+                                    message.imagePath!,
+                                    height: 150,
+                                    fit: BoxFit.cover,
+                                  )),
                       ),
                     ),
                   MarkdownBody(

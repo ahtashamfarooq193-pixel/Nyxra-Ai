@@ -149,33 +149,86 @@ async function callMistral(messages) {
 }
 
 async function callCloudflare(messages) {
-  const token = (process.env.CLOUDFLARE_TOKEN || "").trim();
+  const tokens = parseCsv(process.env.CLOUDFLARE_TOKEN);
   const accountId = (process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
-  if (!token || !accountId) throw new Error("Cloudflare fallback not configured.");
+  if (!tokens.length || !accountId) throw new Error("Cloudflare fallback not configured.");
 
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        model: "@cf/meta/llama-3-8b-instruct",
-        messages,
-        stream: false,
-      }),
+  const failures = [];
+  for (const token of tokens) {
+    try {
+      const response = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/chat/completions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            model: "@cf/meta/llama-3-8b-instruct",
+            messages,
+            stream: false,
+          }),
+        }
+      );
+
+      if (response.status === 429) {
+        failures.push("rate_limited");
+        continue;
+      }
+      if (!response.ok) {
+        const details = await response.text();
+        failures.push(`Cloudflare error ${response.status}: ${details}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const text = data.result?.response?.trim() || data.choices?.[0]?.message?.content?.trim() || "";
+      if (text) return text;
+    } catch (e) {
+      failures.push(`Fetch error: ${e.message}`);
     }
-  );
-
-  if (!response.ok) {
-    const details = await response.text();
-    throw new Error(`Cloudflare error ${response.status}: ${details}`);
   }
+  throw new Error(`All Cloudflare tokens failed. ${failures.join(" | ")}`);
+}
 
-  const data = await response.json();
-  return data.result?.response?.trim() || data.choices?.[0]?.message?.content?.trim() || "";
+async function callCloudflareImage(prompt) {
+  const tokens = parseCsv(process.env.CLOUDFLARE_TOKEN);
+  const accountId = (process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
+  if (!tokens.length || !accountId) throw new Error("Cloudflare image service not configured.");
+
+  const failures = [];
+  for (const token of tokens) {
+    try {
+      const response = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/models/@cf/stabilityai/stable-diffusion-xl-base-1.0`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ prompt }),
+        }
+      );
+
+      if (response.status === 429) {
+        failures.push("rate_limited");
+        continue;
+      }
+      if (!response.ok) {
+        const details = await response.text();
+        failures.push(`Cloudflare Image error ${response.status}: ${details}`);
+        continue;
+      }
+
+      const buffer = await response.arrayBuffer();
+      return Buffer.from(buffer).toString("base64");
+    } catch (e) {
+      failures.push(`Fetch error: ${e.message}`);
+    }
+  }
+  throw new Error(`Image generation failed. ${failures.join(" | ")}`);
 }
 
 async function generateResponse(messages, imageBase64) {
@@ -211,6 +264,18 @@ app.post("/api/chat", async (req, res) => {
 
     if (!userMessage && !imageBase64) {
       return res.status(400).json({ error: "Message or image is required." });
+    }
+
+    // Check if it's an image generation request
+    if (userMessage.toLowerCase().startsWith("/draw ")) {
+      const prompt = userMessage.substring(6).trim();
+      if (!prompt) return res.status(400).json({ error: "Prompt is required for drawing." });
+      
+      const generatedImageBase64 = await callCloudflareImage(prompt);
+      return res.json({ 
+        text: `🎨 **Generated Image:** Here is what I created for: "${prompt}"`,
+        generatedImage: generatedImageBase64 
+      });
     }
 
     const messages = buildMessages(userMessage, conversationHistory, imageBase64);

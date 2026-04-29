@@ -109,31 +109,62 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _initTts() async {
-    // Attempt to set a more natural sounding voice
-    await _flutterTts.setLanguage("en-US");
-    await _flutterTts.setSpeechRate(0.4); // Slightly slower for better clarity
-    await _flutterTts.setVolume(1.0);
-    await _flutterTts.setPitch(0.9); // Slightly lower pitch for a more human-like tone
-    
     try {
-      // Try to set the engine to Google TTS for better quality (Android only)
-      await _flutterTts.setEngine("com.google.android.tts");
+      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.setSpeechRate(0.45); // Balanced speed
+      await _flutterTts.setVolume(1.0);
+      await _flutterTts.setPitch(1.0);
+      
+      // Try to set the engine to Google TTS (Best for Android)
+      if (!kIsWeb && Theme.of(context).platform == TargetPlatform.android) {
+        await _flutterTts.setEngine("com.google.android.tts");
+      }
         
-        // List voices to debug or find a better one
-        var voices = await _flutterTts.getVoices;
-        if (voices != null) {
-          // Look for a higher quality female voice (often sounds more professional)
-          for (var voice in voices) {
-            if (voice["name"].toString().contains("en-us-x-sfg#female_1-local") || 
-                voice["name"].toString().contains("en-us-x-tpf-local")) {
-              await _flutterTts.setVoice({"name": voice["name"], "locale": voice["locale"]});
-              break;
-            }
+      // Fetch available voices and try to find a "Premium/Enhanced" one
+      var voices = await _flutterTts.getVoices;
+      if (voices != null) {
+        List<dynamic> voiceList = List<dynamic>.from(voices);
+        
+        // Priority list for professional sounding voices
+        final priorityVoices = [
+          "en-us-x-sfg#female_1-local",
+          "en-us-x-tpf-local",
+          "en-us-x-iol-local",
+          "en-us-x-low-local",
+          "en-gb-x-fis-local",
+        ];
+
+        for (var priority in priorityVoices) {
+          final found = voiceList.firstWhere(
+            (v) => v["name"].toString().contains(priority),
+            orElse: () => null,
+          );
+          if (found != null) {
+            await _flutterTts.setVoice({"name": found["name"], "locale": found["locale"]});
+            print("Selected Premium Voice: ${found["name"]}");
+            break;
+          }
         }
       }
     } catch (e) {
       print("TTS Optimization Error: $e");
     }
+  }
+
+  // Helper to fix pronunciation of names and Urdu words
+  String _prepareTextForSpeech(String text) {
+    String processed = text;
+    // Fix user's name pronunciation
+    processed = processed.replaceAll(RegExp(r'\bAhtasham\b', caseSensitive: false), "Eh-tah-shaam");
+    processed = processed.replaceAll(RegExp(r'\bAhtasham Farooq\b', caseSensitive: false), "Eh-tah-shaam Fa-rook");
+    
+    // Fix common AI mispronunciations in greeting
+    processed = processed.replaceAll("Assalam-o-Alaikum", "As-salaam-o-alaikum");
+    
+    // Clean markdown characters for smoother speech
+    processed = processed.replaceAll(RegExp(r'[\*\#_]'), "");
+    
+    return processed;
   }
 
   void _startNewChat() {
@@ -448,6 +479,20 @@ class _ChatScreenState extends State<ChatScreen> {
           isFirstChunk = false;
         }
 
+        if (chunk.startsWith("|||IMG|||")) {
+          final base64Data = chunk.substring(9);
+          setState(() {
+            final index = _messages.indexWhere((m) => m.id == aiMessageId);
+            if (index != -1) {
+              aiMessage = aiMessage.copyWith(
+                imagePath: "data:image/png;base64,$base64Data",
+              );
+              _messages[index] = aiMessage;
+            }
+          });
+          continue;
+        }
+
         setState(() {
           final index = _messages.indexWhere((m) => m.id == aiMessageId);
           if (index != -1) {
@@ -464,7 +509,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _syncMessageToCloud(aiMessage);
 
       if (_isVoiceEnabled || isVoiceInput) {
-        _flutterTts.speak(aiMessage.text);
+        _flutterTts.speak(_prepareTextForSpeech(aiMessage.text));
       }
 
       // 2. Token Deduction
