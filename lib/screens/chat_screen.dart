@@ -88,9 +88,21 @@ class _ChatScreenState extends State<ChatScreen> {
         _userTokens = tokens;
       });
       if (_userTokens == 5000) {
-        // Show reset message as requested
+        // Show reset message in English at the top
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Aaj ke 5000 free tokens ready hain!')),
+          SnackBar(
+            content: Text(
+              '✅ Your 5,000 daily free tokens have been reset!',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: AppConstants.primaryColor,
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(
+              bottom: MediaQuery.of(context).size.height - 100,
+              left: 20,
+              right: 20,
+            ),
+          ),
         );
       }
     }

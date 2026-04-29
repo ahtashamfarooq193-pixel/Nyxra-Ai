@@ -7,7 +7,7 @@ import '../models/message.dart';
 class ChatService {
   static const String _backendBaseUrl = String.fromEnvironment(
     'BACKEND_BASE_URL',
-    defaultValue: 'http://localhost:8080',
+    defaultValue: 'https://nyxra-ai.vercel.app',
   );
 
   Stream<String> getAIResponseStream(
@@ -60,19 +60,13 @@ class ChatService {
 
   List<String> _chunkResponse(String text) {
     final chunks = <String>[];
-    final words = text.split(RegExp(r'(\s+)'));
-    final buffer = StringBuffer();
-
-    for (final word in words) {
-      buffer.write(word);
-      if (buffer.length >= 24) {
-        chunks.add(buffer.toString());
-        buffer.clear();
+    const chunkSize = 24;
+    for (int i = 0; i < text.length; i += chunkSize) {
+      final end = (i + chunkSize < text.length) ? i + chunkSize : text.length;
+      final chunk = text.substring(i, end);
+      if (chunk.isNotEmpty) {
+        chunks.add(chunk);
       }
-    }
-
-    if (buffer.isNotEmpty) {
-      chunks.add(buffer.toString());
     }
 
     return chunks.isEmpty ? [text] : chunks;

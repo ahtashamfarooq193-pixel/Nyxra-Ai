@@ -2,6 +2,10 @@
 cmake_minimum_required(VERSION 3.14)
 project(my_chatgpt LANGUAGES CXX)
 
+# Newer CMake versions error on third-party scripts requesting very old minimums.
+# This keeps compatibility when Firebase C++ SDK asks for CMake 3.1.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
 set(BINARY_NAME "my_chatgpt")

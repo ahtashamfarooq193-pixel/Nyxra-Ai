@@ -38,8 +38,10 @@ class TokenStoreScreen extends StatelessWidget {
               children: [
                 _buildHeader(),
                 const SizedBox(height: 30),
+                _buildUnlimitedCard(), // Moved to top
+                const SizedBox(height: 30),
                 Text(
-                  'Select a Package',
+                  'Flexible Packages',
                   style: GoogleFonts.poppins(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -48,8 +50,6 @@ class TokenStoreScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 _buildPackageGrid(context),
-                const SizedBox(height: 30),
-                _buildUnlimitedCard(),
                 const SizedBox(height: 40),
               ],
             ),
@@ -126,9 +126,9 @@ class TokenStoreScreen extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
-        childAspectRatio: 0.85,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
+        childAspectRatio: screenWidth < 600 ? 1.05 : 0.9, // More compact on mobile
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
       ),
       itemCount: packages.length,
       itemBuilder: (context, index) {
@@ -174,24 +174,24 @@ class TokenStoreScreen extends StatelessWidget {
               ),
             ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14), // Smaller padding
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   pkg.label,
                   style: GoogleFonts.inter(
-                    fontSize: 12,
+                    fontSize: 10, // Smaller font
                     fontWeight: FontWeight.w600,
                     color: Colors.white54,
-                    letterSpacing: 1,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
                   '${pkg.tokens ~/ 1000}K',
                   style: GoogleFonts.poppins(
-                    fontSize: 24,
+                    fontSize: 20, // Smaller font
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
@@ -199,22 +199,23 @@ class TokenStoreScreen extends StatelessWidget {
                 Text(
                   'Tokens',
                   style: GoogleFonts.inter(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: Colors.white38,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
                   decoration: BoxDecoration(
                     color: pkg.isPopular ? AppConstants.primaryColor : Colors.white.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Center(
                     child: Text(
                       '\$${pkg.price.toStringAsFixed(0)}',
                       style: GoogleFonts.inter(
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
@@ -231,78 +232,106 @@ class TokenStoreScreen extends StatelessWidget {
 
   Widget _buildUnlimitedCard() {
     return Container(
-      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.3), width: 1),
+        border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.4), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFFD700).withOpacity(0.05),
-            blurRadius: 20,
+            color: const Color(0xFFFFD700).withOpacity(0.08),
+            blurRadius: 25,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Row(
+      child: Stack(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFD700),
+                borderRadius: BorderRadius.only(
+                  topRight: Radius.circular(22),
+                  bottomLeft: Radius.circular(16),
+                ),
+              ),
+              child: Text(
+                '🔥 HOT',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFD700).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFD700).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'MONTHLY PASS',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFFFFD700),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Unlimited Access',
+                        style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Go limit-less for 30 days',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: Colors.white54,
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    'MONTHLY PASS',
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFFFFD700),
+                ),
+                Column(
+                  children: [
+                    Text(
+                      '\$15',
+                      style: GoogleFonts.poppins(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFFFFD700),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Unlimited Access',
-                  style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Go limit-less for 30 days',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: Colors.white54,
-                  ),
+                    Text(
+                      '/month',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Colors.white38,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ),
-          Column(
-            children: [
-              Text(
-                '\$15',
-                style: GoogleFonts.poppins(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFFFFD700),
-                ),
-              ),
-              Text(
-                '/month',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: Colors.white38,
-                ),
-              ),
-            ],
           ),
         ],
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/message.dart';
 import '../utils/constants.dart';
 
@@ -66,21 +67,39 @@ class MessageBubble extends StatelessWidget {
                                 height: 150,
                                 fit: BoxFit.cover,
                               )
-                            : Image.network( // Placeholder for mobile if file path is used, actually better to use network since mobile also uses picker which returns paths
+                            : Image.network( 
                                 message.imagePath!,
                                 height: 150,
                                 fit: BoxFit.cover,
                               ),
                       ),
                     ),
-                  Text(
-                    message.text,
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      color: Colors.white.withOpacity(0.95),
-                      height: 1.5,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: 0.2,
+                  MarkdownBody(
+                    data: message.text,
+                    styleSheet: MarkdownStyleSheet(
+                      p: GoogleFonts.inter(
+                        fontSize: 15,
+                        color: Colors.white.withOpacity(0.95),
+                        height: 1.5,
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: 0.2,
+                      ),
+                      strong: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                      em: const TextStyle(fontStyle: FontStyle.italic),
+                      listBullet: const TextStyle(color: Colors.white70),
+                      code: GoogleFonts.firaCode(
+                        backgroundColor: Colors.black26,
+                        fontSize: 13,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                      codeblockDecoration: BoxDecoration(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      blockquote: const TextStyle(color: Colors.white60),
+                      blockquoteDecoration: const BoxDecoration(
+                        border: Border(left: BorderSide(color: Colors.white24, width: 4)),
+                      ),
                     ),
                   ),
                 ],
@@ -109,5 +128,3 @@ class MessageBubble extends StatelessWidget {
     return '$hour:$minute';
   }
 }
-
-
