@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:http/http.dart' as http;
 import '../models/message.dart';
 
 class ChatService {
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  static const String _backendBaseUrl = String.fromEnvironment(
+    'BACKEND_BASE_URL',
+    defaultValue: 'http://localhost:8080',
+  );
 
   Stream<String> getAIResponseStream(
     String userMessage,
@@ -14,14 +17,12 @@ class ChatService {
     Uint8List? imageBytes,
   }) async* {
     try {
-      final callable = _functions.httpsCallable(
-        'generateAiResponse',
-        options: HttpsCallableOptions(
-          timeout: const Duration(seconds: 60),
-        ),
-      );
-
-      final response = await callable.call({
+      final response = await http.post(
+        Uri.parse('$_backendBaseUrl/api/chat'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
         'userMessage': userMessage,
         'conversationHistory': conversationHistory
             .map(
@@ -33,9 +34,16 @@ class ChatService {
             .toList(),
         'imageBase64': imageBytes == null ? null : base64Encode(imageBytes),
         'imagePath': imagePath,
-      });
+      }),
+      ).timeout(const Duration(seconds: 60));
 
-      final text = (response.data as Map)['text']?.toString().trim() ?? '';
+      if (response.statusCode != 200) {
+        yield '❌ **Server Error:** ${response.statusCode}';
+        return;
+      }
+
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final text = decoded['text']?.toString().trim() ?? '';
       if (text.isEmpty) {
         yield '❌ **Empty response:** Please try again.';
         return;
@@ -45,13 +53,7 @@ class ChatService {
         yield chunk;
         await Future.delayed(const Duration(milliseconds: 18));
       }
-    } on FirebaseFunctionsException catch (e) {
-      if (e.code == 'unauthenticated') {
-        yield '❌ **Sign in required:** Please login to continue.';
-        return;
-      }
-      yield '❌ **Server Error:** ${e.message ?? 'Please try again in a few minutes.'}';
-    } catch (_) {
+    } catch (e) {
       yield '❌ **Connection Error:** Failed to connect to secure AI service. Please try again.';
     }
   }
