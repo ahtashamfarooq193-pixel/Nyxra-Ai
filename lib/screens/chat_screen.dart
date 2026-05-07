@@ -456,9 +456,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Create a placeholder for AI message
     final aiMessageId = (DateTime.now().millisecondsSinceEpoch + 1).toString();
+    
+    // Check if it's an image request to show a better loading state
+    final lowerText = trimmedText.toLowerCase();
+    final isImageRequest = lowerText.startsWith('/') || 
+                          lowerText.startsWith('draw') || 
+                          lowerText.startsWith('generate') ||
+                          lowerText.startsWith('imagine') ||
+                          lowerText.startsWith('banao');
+
     Message aiMessage = Message(
       id: aiMessageId,
-      text: '',
+      text: isImageRequest ? '🎨 Drawing your imagination...' : '',
       isUser: false,
       timestamp: DateTime.now(),
       status: MessageStatus.sending,
@@ -483,6 +492,11 @@ class _ChatScreenState extends State<ChatScreen> {
             _isLoading = false; // Hide typing indicator once stream starts
           });
           isFirstChunk = false;
+        }
+
+        // If it's an image response, clear the "Drawing..." placeholder first
+        if (chunk.startsWith("|||IMG|||") && aiMessage.text.contains('Drawing')) {
+           aiMessage = aiMessage.copyWith(text: '');
         }
 
         if (chunk.startsWith("|||IMG|||")) {

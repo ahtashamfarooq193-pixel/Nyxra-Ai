@@ -76,21 +76,29 @@ class _MessageInputState extends State<MessageInput> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickImage(ImageSource source) async {
     try {
       if (!kIsWeb) {
         // Permission handling for mobile
-        var status = await Permission.photos.request();
-        if (status.isDenied || status.isPermanentlyDenied) {
-          status = await Permission.storage.request();
-        }
-        if (status.isPermanentlyDenied) {
-          openAppSettings();
-          return;
+        if (source == ImageSource.gallery) {
+          var status = await Permission.photos.request();
+          if (status.isDenied || status.isPermanentlyDenied) {
+            status = await Permission.storage.request();
+          }
+          if (status.isPermanentlyDenied) {
+            openAppSettings();
+            return;
+          }
+        } else {
+          var status = await Permission.camera.request();
+          if (status.isDenied || status.isPermanentlyDenied) {
+            openAppSettings();
+            return;
+          }
         }
       }
 
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      final XFile? image = await _picker.pickImage(source: source);
       if (image != null) {
         setState(() {
           _pickedXFile = image;
@@ -99,6 +107,169 @@ class _MessageInputState extends State<MessageInput> {
     } catch (e) {
       print('Error picking image: $e');
     }
+  }
+
+  void _showAttachmentMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+        decoration: BoxDecoration(
+          color: AppConstants.surfaceColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 25),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildMenuOption(
+                  icon: Icons.image_rounded,
+                  label: 'Gallery',
+                  color: Colors.blueAccent,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+                _buildMenuOption(
+                  icon: Icons.camera_alt_rounded,
+                  label: 'Camera',
+                  color: Colors.greenAccent,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                _buildMenuOption(
+                  icon: Icons.auto_awesome_rounded,
+                  label: 'AI Image',
+                  color: Colors.purpleAccent,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showAIImageDialog();
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAIImageDialog() {
+    final TextEditingController promptController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppConstants.surfaceColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.auto_awesome_rounded, color: Colors.purpleAccent),
+            const SizedBox(width: 10),
+            Text('AI Image Generator', style: GoogleFonts.poppins(color: Colors.white, fontSize: 18)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Describe what you want to create:',
+              style: GoogleFonts.inter(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: promptController,
+              autofocus: true,
+              style: GoogleFonts.inter(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'e.g. A futuristic city at sunset',
+                hintStyle: GoogleFonts.inter(color: Colors.white24),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            child: Text('Cancel', style: GoogleFonts.inter(color: Colors.white60)),
+            onPressed: () => Navigator.pop(context),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purpleAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text('Generate', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
+            onPressed: () {
+              final prompt = promptController.text.trim();
+              if (prompt.isNotEmpty) {
+                Navigator.pop(context);
+                _controller.text = "/draw $prompt";
+                _handleSend();
+              }
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   void _removeImage() {
@@ -252,7 +423,7 @@ class _MessageInputState extends State<MessageInput> {
                       color: Colors.white.withOpacity(0.8),
                       size: 26,
                     ),
-                    onPressed: _pickImage,
+                    onPressed: _showAttachmentMenu,
                   ),
                 ),
                 Flexible(

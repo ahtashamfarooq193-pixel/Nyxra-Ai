@@ -18,10 +18,10 @@ const SYSTEM_INSTRUCTION =
   '- DO NOT mix languages unless specifically asked.\n\n' +
   'GREETING RULE:\n' +
   '- Only greet at the start of a conversation or if the user greets you.\n' +
-  '- Use "Assalam-o-Alaikum" for Roman Urdu users and "Hello/Hi" for English users.\n' +
-  '- In ongoing chat, skip the greeting and answer directly.\n\n' +
-  'STRICT TOKEN RULES:\n' +
-  '- Daily limit: 5000 tokens. Do not mention this unless asked.\n\n' +
+  '- Use "Assalam-o-Alaikum" for Roman Urdu users and "Hello/Hi" for English users.\n\n' +
+  'IMAGE CAPABILITIES:\n' +
+  '- You CAN generate images. If a user asks you to draw or create an image, tell them you can do it.\n' +
+  '- Direct the user to use words like "draw", "generate", or "tasveer banao" if they are confused.\n\n' +
   'IDENTITY:\n' +
   '- Developed by "Ahtasham", an SE student: https://ahtashamfarooq.netlify.app/\n' +
   '- Tone: Professional, helpful, and concise.';
@@ -33,7 +33,80 @@ function parseCsv(value) {
     .filter(Boolean);
 }
 
+async function callGemini(messages, imageBase64) {
+  const apiKey = (process.env.GEMINI_API_KEY || "").trim();
+  if (!apiKey) throw new Error("Missing GEMINI_API_KEY in backend env.");
+
+  const model = "gemini-1.5-flash"; // High speed and efficient
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const contents = messages.map(msg => {
+    let role = msg.role === "assistant" ? "model" : "user";
+    // Gemini doesn't support "system" role in the "contents" array for simple calls easily, 
+    // it's better to prepend system instruction to the first message or use systemInstruction field.
+    // For simplicity, we convert system to user or model based on context.
+    if (msg.role === "system") {
+      role = "user"; // Or handle specifically
+    }
+
+    const parts = [];
+    if (Array.isArray(msg.content)) {
+      for (const part of msg.content) {
+        if (part.type === "text") {
+          parts.push({ text: part.text });
+        } else if (part.type === "image_url") {
+          const base64Match = part.image_url.url.match(/^data:(image\/[a-z]+);base64,(.+)$/);
+          if (base64Match) {
+            parts.push({
+              inlineData: {
+                mimeType: base64Match[1],
+                data: base64Match[2],
+              },
+            });
+          }
+        }
+      }
+    } else {
+      parts.push({ text: msg.content });
+    }
+    return { role, parts };
+  });
+
+  // Handle System Instruction properly for Gemini
+  const systemMsg = messages.find(m => m.role === "system");
+  const payload = {
+    contents: contents.filter(c => messages[contents.indexOf(c)].role !== "system"),
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 4096,
+    }
+  };
+
+  if (systemMsg) {
+    payload.systemInstruction = {
+      parts: [{ text: systemMsg.content }]
+    };
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Gemini error ${response.status}: ${details}`);
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+  if (!text) throw new Error("Empty response from Gemini.");
+  return text;
+}
+
 function buildMessages(userMessage, conversationHistory, imageBase64) {
+
   const messages = [{ role: "system", content: SYSTEM_INSTRUCTION }];
   const history = Array.isArray(conversationHistory) ? conversationHistory.slice(-10) : [];
 
@@ -61,6 +134,32 @@ function buildMessages(userMessage, conversationHistory, imageBase64) {
   }
 
   return messages;
+}
+
+async function callPollinationsText(messages) {
+  const apiKey = (process.env.POLLINATIONS_API_KEY || "").trim();
+  const model = "gemini"; // Use Gemini via Pollinations
+
+  const response = await fetch("https://text.pollinations.ai/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    },
+    body: JSON.stringify({
+      messages,
+      model,
+      stream: false,
+    }),
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Pollinations Text error ${response.status}: ${details}`);
+  }
+
+  const text = await response.text();
+  return text.trim();
 }
 
 async function callGroq(messages, imageBase64) {
@@ -230,12 +329,72 @@ async function callCloudflareImage(prompt) {
   throw new Error(`Image generation failed. ${failures.join(" | ")}`);
 }
 
-async function generateResponse(messages, imageBase64) {
+async function callPollinationsGeminiImage(prompt) {
+  const apiKey = (process.env.POLLINATIONS_API_KEY || "").trim();
+  const baseUrl = (process.env.POLLINATIONS_IMAGE_BASE_URL || "https://image.pollinations.ai/prompt").trim();
+  const model = (process.env.POLLINATIONS_IMAGE_MODEL || "gemini").trim();
+  const width = Number(process.env.POLLINATIONS_IMAGE_WIDTH || 1024);
+  const height = Number(process.env.POLLINATIONS_IMAGE_HEIGHT || 1024);
+
+  const requestUrl =
+    `${baseUrl}/${encodeURIComponent(prompt)}` +
+    `?model=${encodeURIComponent(model)}&width=${width}&height=${height}&nologo=true` +
+    (apiKey ? `&key=${apiKey}` : "");
+
+  const response = await fetch(requestUrl, {
+    method: "GET",
+    headers: {
+      Accept: "image/*",
+    },
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Pollinations Gemini error ${response.status}: ${details}`);
+  }
+
+  const buffer = await response.arrayBuffer();
+  return Buffer.from(buffer).toString("base64");
+}
+
+async function generateImageResponse(prompt) {
   const providers = [
+    { name: "Pollinations-Gemini", call: () => callPollinationsGeminiImage(prompt) },
+    { name: "Cloudflare", call: () => callCloudflareImage(prompt) },
+  ];
+
+  const failures = [];
+  for (const provider of providers) {
+    try {
+      const imageBase64 = await provider.call();
+      if (imageBase64) return imageBase64;
+      failures.push(`${provider.name}: empty response`);
+    } catch (error) {
+      failures.push(`${provider.name}: ${error.message}`);
+    }
+  }
+
+  throw new Error(`Image generation failed across providers. ${failures.join(" | ")}`);
+}
+
+async function generateResponse(messages, imageBase64) {
+  const providers = [];
+  
+  // 1. Google Gemini (Official)
+  if (process.env.GEMINI_API_KEY) {
+    providers.push({ name: "Gemini-Official", call: () => callGemini(messages, imageBase64) });
+  }
+
+  // 2. Pollinations Gemini (If key provided)
+  if (process.env.POLLINATIONS_API_KEY) {
+    providers.push({ name: "Pollinations-Gemini", call: () => callPollinationsText(messages) });
+  }
+  
+  providers.push(
     { name: "Groq", call: () => callGroq(messages, imageBase64) },
     { name: "Mistral", call: () => callMistral(messages) },
-    { name: "Cloudflare", call: () => callCloudflare(messages) },
-  ];
+    { name: "Cloudflare", call: () => callCloudflare(messages) }
+  );
 
   const failures = [];
   for (const provider of providers) {
@@ -267,26 +426,54 @@ app.post("/api/chat", async (req, res) => {
 
     // Check if it's an image generation request
     const lowerMsg = userMessage.toLowerCase();
-    const imageKeywords = ["/draw", "generate image", "create image", "make an image", "draw an image", "generate an image"];
+    console.log(`Incoming message: "${userMessage}"`);
+    
+    // Comprehensive list of triggers (English & Roman Urdu)
+    const imageTriggers = [
+      "/draw", "/image", "/gen", "/imagine",
+      "generate image", "create image", "make an image", "draw an image", "generate an image",
+      "image of", "photo of", "picture of", "draw a", "draw an", "imagine a", "imagine an",
+      "tasveer banao", "image banao", "pic banao", "draw karo", "bnao", "dikhao", 
+      "generate", "genrate", "imagine", "create", "draw", "tasveer", "picture", "photo", "pic", "image"
+    ];
     
     let isImageRequest = false;
     let imagePrompt = "";
 
-    for (const keyword of imageKeywords) {
-      if (lowerMsg.startsWith(keyword)) {
-        isImageRequest = true;
-        imagePrompt = userMessage.substring(keyword.length).trim();
-        if (imagePrompt.startsWith("of ")) imagePrompt = imagePrompt.substring(3).trim();
-        break;
+    // 1. Check for triggers anywhere in the message if it's relatively short
+    // This allows for "Please generate an image of..." or "Lion ki tasveer dikhao"
+    if (lowerMsg.length < 200) {
+      for (const trigger of imageTriggers) {
+        if (lowerMsg.includes(trigger)) {
+          isImageRequest = true;
+          // Prompt logic: if it's a trigger word like "draw", use the text after it.
+          // If it's a general keyword like "tasveer", use the whole message as context.
+          if (lowerMsg.startsWith(trigger)) {
+            imagePrompt = userMessage.substring(trigger.length).trim();
+          } else {
+            imagePrompt = userMessage.trim();
+          }
+          break;
+        }
       }
     }
 
     if (isImageRequest && imagePrompt) {
-      const generatedImageBase64 = await callCloudflareImage(imagePrompt);
-      return res.json({ 
-        text: `🎨 **Generated Image:** Here is what I created for: "${imagePrompt}"`,
-        generatedImage: generatedImageBase64 
-      });
+      // Clean up the prompt
+      const cleanPrompt = imagePrompt
+        .replace(/^of\s+/i, "")
+        .replace(/^a\s+/i, "")
+        .replace(/^an\s+/i, "")
+        .trim();
+
+      if (cleanPrompt) {
+        console.log(`Generating image for prompt: "${cleanPrompt}"`);
+        const generatedImageBase64 = await generateImageResponse(cleanPrompt);
+        return res.json({ 
+          text: `🎨 **Nyxra Image Engine:** Here is the image I generated for you:\n\n*"${cleanPrompt}"*`,
+          generatedImage: generatedImageBase64 
+        });
+      }
     }
 
     const messages = buildMessages(userMessage, conversationHistory, imageBase64);
