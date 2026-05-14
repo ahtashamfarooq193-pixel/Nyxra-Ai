@@ -1,10 +1,11 @@
-const path = require("path");
-require("dotenv").config({
-  path: path.join(__dirname, ".env"),
-  override: true,
-});
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
+
+// Load .env only in local development
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config();
+}
 
 const app = express();
 app.use(cors());
@@ -470,7 +471,16 @@ async function generateResponse(messages, imageBase64) {
 }
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "nyxra-backend" });
+  res.json({ 
+    ok: true, 
+    status: "active", 
+    time: new Date().toISOString(),
+    providers: {
+      gemini: !!process.env.GEMINI_API_KEY,
+      groq: !!process.env.GROQ_API_KEYS,
+      pollinations: !!process.env.POLLINATIONS_API_KEY
+    }
+  });
 });
 
 app.post("/api/chat", async (req, res) => {
