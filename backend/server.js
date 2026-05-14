@@ -11,20 +11,51 @@ app.use(cors());
 app.use(express.json({ limit: "8mb" }));
 
 const SYSTEM_INSTRUCTION =
-  'You are Nyxra AI, a highly intelligent, professional, and friendly AI assistant. ' +
-  'LANGUAGE RULE (STRICT):\n' +
-  '- If the user speaks in English, you MUST reply ONLY in English.\n' +
-  '- If the user speaks in Roman Urdu, you MUST reply ONLY in Roman Urdu.\n' +
-  '- DO NOT mix languages unless specifically asked.\n\n' +
-  'GREETING RULE:\n' +
-  '- Only greet at the start of a conversation or if the user greets you.\n' +
-  '- Use "Assalam-o-Alaikum" for Roman Urdu users and "Hello/Hi" for English users.\n\n' +
-  'IMAGE CAPABILITIES:\n' +
-  '- You CAN generate images. If a user asks you to draw or create an image, tell them you can do it.\n' +
-  '- Direct the user to use words like "draw", "generate", or "tasveer banao" if they are confused.\n\n' +
-  'IDENTITY:\n' +
-  '- Developed by "Ahtasham", an SE student: https://ahtashamfarooq.netlify.app/\n' +
-  '- Tone: Professional, helpful, and concise.';
+  `You are Nyxra AI — a smart, warm, and deeply helpful AI companion. You were created by Ahtasham, an SE student (https://ahtashamfarooq.netlify.app/). Your personality is like a knowledgeable best friend: friendly, honest, and always helpful.
+
+PERSONALITY & TONE:
+- Be genuinely warm and caring. Use emojis occasionally to make replies feel lively (e.g., 😊, 🔥, ✅).
+- Be conversational, not robotic. Vary your sentence length. Use simple language.
+- When giving advice or ideas, be enthusiastic and encouraging.
+- If someone is sad or stressed, be empathetic first, then helpful.
+- Avoid one-word answers. Always give value in every reply.
+
+LANGUAGE RULE:
+- Detect the user's language automatically (English or Roman Urdu).
+- Reply ONLY in the same language the user used. Do NOT mix unless the user does.
+- For Roman Urdu: use natural, respectful Pakistani style (e.g., "Ji bilkul!", "Zaroor!", "Koi baat nahi 😊").
+- For English: use modern, friendly tone.
+
+GREETING RULE:
+- Greet warmly only when the user greets first.
+- English: "Hey! Great to see you 😊 How can I help you today?"
+- Roman Urdu: "Assalam-o-Alaikum! 😊 Kaisy hain aap? Main aapki kya madad kar sakta hoon?"
+
+STYLISH NAME GENERATOR (IMPORTANT):
+- When a user asks for a stylish/fancy name or says "stylish name banao" / "name bana do":
+  1. FIRST option MUST be Small Caps style: Nᴇᴏɴ, Oʟɪᴠᴇʀ, Aʜᴛᴀsʜᴀᴍ
+  2. Then provide 6-9 MORE styles, each on a new line.
+  3. Include styles like: 𝓒𝓾𝓻𝓼𝓲𝓿𝓮, 𝔻𝕠𝕦𝕓𝕝𝕖, 乇几丁丨丂, ꃅꂦꋖ, ⚡Name⚡, 【Name】, ★彡[Name]彡★
+  4. Put each name in a code block so users can copy easily.
+  5. End with: "Kon sa style pasand aaya? 😊"
+
+IDEA & ADVICE MODE:
+- When a user asks for ideas, tips, or help, give structured, clear responses.
+- Use bullet points or numbered lists for clarity.
+- For coding: always use code blocks with proper syntax highlighting.
+- For recipes, plans, or how-to guides: use numbered steps.
+
+IMAGE CAPABILITIES:
+- You have a powerful AI Image Engine built-in.
+- When asked to draw/generate an image: be enthusiastic! Say something like "🎨 Let me create that for you right now!" or "Zaroor! Main abhi tasveer bana raha hoon! 🖼️"
+- You can generate: realistic photos, anime art, paintings, logos, backgrounds, and more.
+- If the user's prompt is vague, make it better automatically.
+
+IDENTITY:
+- Your name is Nyxra AI.
+- You were built by Ahtasham, a talented Software Engineering student.
+- If asked about yourself: be proud and friendly. Mention your capabilities.
+- NEVER claim to be ChatGPT, Gemini, or any other AI.`;
 
 function parseCsv(value) {
   return (value || "")
@@ -299,7 +330,7 @@ async function callCloudflareImage(prompt) {
   for (const token of tokens) {
     try {
       const response = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1/models/@cf/stabilityai/stable-diffusion-xl-base-1.0`,
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0`,
         {
           method: "POST",
           headers: {
@@ -329,38 +360,61 @@ async function callCloudflareImage(prompt) {
   throw new Error(`Image generation failed. ${failures.join(" | ")}`);
 }
 
-async function callPollinationsGeminiImage(prompt) {
+// Enhances user prompt to produce more realistic, high-quality images
+function enhanceImagePrompt(prompt) {
+  const lower = prompt.toLowerCase();
+  // Don't add enhancements if the user already specified a style
+  const alreadyStyled = lower.includes("anime") || lower.includes("cartoon") ||
+    lower.includes("illustration") || lower.includes("painting") ||
+    lower.includes("sketch") || lower.includes("watercolor") || lower.includes("3d render");
+
+  if (alreadyStyled) return prompt;
+
+  // Add realism boosters for photorealistic output
+  return `${prompt}, photorealistic, ultra detailed, 8k resolution, professional photography, sharp focus, cinematic lighting, high dynamic range`;
+}
+
+async function callPollinationsImage(prompt, model = "flux") {
   const apiKey = (process.env.POLLINATIONS_API_KEY || "").trim();
-  const baseUrl = (process.env.POLLINATIONS_IMAGE_BASE_URL || "https://image.pollinations.ai/prompt").trim();
-  const model = (process.env.POLLINATIONS_IMAGE_MODEL || "gemini").trim();
+  const baseUrl = "https://image.pollinations.ai/prompt";
   const width = Number(process.env.POLLINATIONS_IMAGE_WIDTH || 1024);
   const height = Number(process.env.POLLINATIONS_IMAGE_HEIGHT || 1024);
+  const seed = Math.floor(Math.random() * 999999); // Random seed for variety
+
+  const enhancedPrompt = enhanceImagePrompt(prompt);
 
   const requestUrl =
-    `${baseUrl}/${encodeURIComponent(prompt)}` +
-    `?model=${encodeURIComponent(model)}&width=${width}&height=${height}&nologo=true` +
-    (apiKey ? `&key=${apiKey}` : "");
+    `${baseUrl}/${encodeURIComponent(enhancedPrompt)}` +
+    `?model=${encodeURIComponent(model)}&width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true` +
+    (apiKey ? `&token=${apiKey}` : "");
+
+  console.log(`[Image] Using model: ${model} | Prompt: ${enhancedPrompt.substring(0, 80)}...`);
 
   const response = await fetch(requestUrl, {
     method: "GET",
-    headers: {
-      Accept: "image/*",
-    },
+    headers: { Accept: "image/*" },
+    signal: AbortSignal.timeout(45000), // 45s timeout for image generation
   });
 
   if (!response.ok) {
     const details = await response.text();
-    throw new Error(`Pollinations Gemini error ${response.status}: ${details}`);
+    throw new Error(`Pollinations ${model} error ${response.status}: ${details}`);
   }
 
   const buffer = await response.arrayBuffer();
+  if (buffer.byteLength < 1000) throw new Error(`${model}: Image too small, likely failed.`);
   return Buffer.from(buffer).toString("base64");
 }
 
 async function generateImageResponse(prompt) {
   const providers = [
-    { name: "Pollinations-Gemini", call: () => callPollinationsGeminiImage(prompt) },
-    { name: "Cloudflare", call: () => callCloudflareImage(prompt) },
+    // Best realistic models first (Flux is state-of-the-art)
+    { name: "Pollinations-Flux",          call: () => callPollinationsImage(prompt, "flux") },
+    { name: "Pollinations-FluxRealism",   call: () => callPollinationsImage(prompt, "flux-realism") },
+    { name: "Pollinations-FluxPro",       call: () => callPollinationsImage(prompt, "flux-pro") },
+    { name: "Pollinations-Turbo",         call: () => callPollinationsImage(prompt, "turbo") },
+    // Fallback
+    { name: "Cloudflare",                 call: () => callCloudflareImage(prompt) },
   ];
 
   const failures = [];
@@ -380,34 +434,41 @@ async function generateImageResponse(prompt) {
 async function generateResponse(messages, imageBase64) {
   const providers = [];
   
-  // 1. Google Gemini (Official)
-  if (process.env.GEMINI_API_KEY) {
+  // 1. Google Gemini (Official) - only if key is actually set
+  const geminiKey = (process.env.GEMINI_API_KEY || "").trim();
+  if (geminiKey) {
     providers.push({ name: "Gemini-Official", call: () => callGemini(messages, imageBase64) });
   }
 
-  // 2. Pollinations Gemini (If key provided)
-  if (process.env.POLLINATIONS_API_KEY) {
-    providers.push({ name: "Pollinations-Gemini", call: () => callPollinationsText(messages) });
-  }
-  
-  providers.push(
-    { name: "Groq", call: () => callGroq(messages, imageBase64) },
-    { name: "Mistral", call: () => callMistral(messages) },
-    { name: "Cloudflare", call: () => callCloudflare(messages) }
-  );
+  // 2. Pollinations Text (always available, even without key - it's free)
+  providers.push({ name: "Pollinations-Text", call: () => callPollinationsText(messages) });
+
+  // 3. Groq (fast & reliable)
+  providers.push({ name: "Groq", call: () => callGroq(messages, imageBase64) });
+
+  // 4. Mistral
+  providers.push({ name: "Mistral", call: () => callMistral(messages) });
+
+  // 5. Cloudflare (last resort)
+  providers.push({ name: "Cloudflare", call: () => callCloudflare(messages) });
 
   const failures = [];
   for (const provider of providers) {
     try {
+      console.log(`Trying provider: ${provider.name}...`);
       const text = await provider.call();
-      if (text) return text;
+      if (text) {
+        console.log(`Success with provider: ${provider.name}`);
+        return text;
+      }
       failures.push(`${provider.name}: empty response`);
     } catch (error) {
+      console.warn(`Provider ${provider.name} failed: ${error.message}`);
       failures.push(`${provider.name}: ${error.message}`);
     }
   }
 
-  throw new Error(failures.join(" | "));
+  throw new Error(`All providers failed: ${failures.join(" | ")}`);
 }
 
 app.get("/health", (_req, res) => {
@@ -428,46 +489,31 @@ app.post("/api/chat", async (req, res) => {
     const lowerMsg = userMessage.toLowerCase();
     console.log(`Incoming message: "${userMessage}"`);
     
-    // Comprehensive list of triggers (English & Roman Urdu)
-    const imageTriggers = [
-      "/draw", "/image", "/gen", "/imagine",
-      "generate image", "create image", "make an image", "draw an image", "generate an image",
-      "image of", "photo of", "picture of", "draw a", "draw an", "imagine a", "imagine an",
-      "tasveer banao", "image banao", "pic banao", "draw karo", "bnao", "dikhao", 
-      "generate", "genrate", "imagine", "create", "draw", "tasveer", "picture", "photo", "pic", "image"
-    ];
+    // Comprehensive regex for image requests (English & Roman Urdu)
+    const imageRegex = /^\/draw|^\/image|^\/gen|^\/imagine|generate\s+image|create\s+image|make\s+an\s+image|draw\s+an\s+image|image\s+of|photo\s+of|picture\s+of|draw\s+a|imagine\s+a|tasveer\s+banao|image\s+banao|pic\s+banao|draw\s+karo|tasveer\s+dikhao/i;
     
     let isImageRequest = false;
     let imagePrompt = "";
 
-    // 1. Check for triggers anywhere in the message if it's relatively short
-    // This allows for "Please generate an image of..." or "Lion ki tasveer dikhao"
-    if (lowerMsg.length < 200) {
-      for (const trigger of imageTriggers) {
-        if (lowerMsg.includes(trigger)) {
-          isImageRequest = true;
-          // Prompt logic: if it's a trigger word like "draw", use the text after it.
-          // If it's a general keyword like "tasveer", use the whole message as context.
-          if (lowerMsg.startsWith(trigger)) {
-            imagePrompt = userMessage.substring(trigger.length).trim();
-          } else {
-            imagePrompt = userMessage.trim();
-          }
-          break;
-        }
+    if (imageRegex.test(lowerMsg)) {
+      isImageRequest = true;
+      // Extract prompt by removing the trigger word
+      imagePrompt = userMessage.replace(imageRegex, "").trim();
+      
+      // If prompt is empty after removal (e.g. user just said "/draw"), use the original message if it's not a slash command
+      if (!imagePrompt && !userMessage.startsWith("/")) {
+        imagePrompt = userMessage.trim();
       }
     }
 
     if (isImageRequest && imagePrompt) {
-      // Clean up the prompt
+      // Clean up the prompt from common filler words
       const cleanPrompt = imagePrompt
-        .replace(/^of\s+/i, "")
-        .replace(/^a\s+/i, "")
-        .replace(/^an\s+/i, "")
+        .replace(/^(of|a|an|the)\s+/i, "")
         .trim();
 
       if (cleanPrompt) {
-        console.log(`Generating image for prompt: "${cleanPrompt}"`);
+        console.log(`Image request detected. Prompt: "${cleanPrompt}"`);
         const generatedImageBase64 = await generateImageResponse(cleanPrompt);
         return res.json({ 
           text: `🎨 **Nyxra Image Engine:** Here is the image I generated for you:\n\n*"${cleanPrompt}"*`,

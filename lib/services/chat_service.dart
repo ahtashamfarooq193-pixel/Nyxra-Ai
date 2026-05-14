@@ -38,7 +38,12 @@ class ChatService {
       ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode != 200) {
-        yield '❌ **Server Error:** ${response.statusCode}';
+        String errorDetail = 'Something went wrong';
+        try {
+          final errDecoded = jsonDecode(response.body);
+          errorDetail = errDecoded['details'] ?? errDecoded['error'] ?? errorDetail;
+        } catch (_) {}
+        yield '❌ **Server Error (${response.statusCode}):** $errorDetail';
         return;
       }
 
@@ -48,13 +53,13 @@ class ChatService {
 
       if (generatedImage != null) {
         // Special marker for images to be caught by the UI
-        yield text;
+        if (text.isNotEmpty) yield text;
         yield "|||IMG|||$generatedImage";
         return;
       }
 
       if (text.isEmpty) {
-        yield '❌ **Empty response:** Please try again.';
+        yield '❌ **Empty response:** AI service didn\'t return any text. Please try again.';
         return;
       }
 
@@ -62,8 +67,11 @@ class ChatService {
         yield chunk;
         await Future.delayed(const Duration(milliseconds: 18));
       }
+    } on TimeoutException {
+      yield '❌ **Timeout Error:** The server is taking too long to respond. Please check your connection.';
     } catch (e) {
-      yield '❌ **Connection Error:** Failed to connect to secure AI service. Please try again.';
+      print('ChatService Error: $e');
+      yield '❌ **Connection Error:** Failed to connect to Nyxra AI service. Please check if the backend is running.';
     }
   }
 
