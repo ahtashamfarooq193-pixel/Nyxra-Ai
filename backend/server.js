@@ -392,7 +392,6 @@ async function callPollinationsImage(prompt, model = "flux") {
   const response = await fetch(requestUrl, {
     method: "GET",
     headers: { Accept: "image/*" },
-    signal: AbortSignal.timeout(45000), // 45s timeout for image generation
   });
 
   if (!response.ok) {
