@@ -390,20 +390,37 @@ class _CopyableCodeBuilder extends MarkdownElementBuilder {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('✅ Copied: $code',
+                      content: Text('✅ Copied to clipboard!',
                           style: GoogleFonts.inter(fontSize: 13)),
-                      backgroundColor: Colors.green.shade800,
+                      backgroundColor: AppConstants.primaryColor,
                       behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 2),
+                      duration: const Duration(seconds: 1),
                     ),
                   );
                 }
               },
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Icon(Icons.copy_rounded,
-                    size: 16, color: Colors.white38),
+              borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: AppConstants.primaryColor.withOpacity(0.1),
+                  border: Border(left: BorderSide(color: Colors.white12)),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.copy_rounded,
+                        size: 16, color: AppConstants.primaryColor),
+                    const SizedBox(height: 4),
+                    Text('Copy', 
+                      style: GoogleFonts.inter(
+                        fontSize: 10, 
+                        fontWeight: FontWeight.bold,
+                        color: AppConstants.primaryColor
+                      )
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
