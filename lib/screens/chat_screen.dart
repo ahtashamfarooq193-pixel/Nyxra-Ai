@@ -171,19 +171,21 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _startNewChat() {
+    if (!mounted) return;
     setState(() {
       _messages.clear();
       _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
       
-      // Add welcome message
+      // Add welcome message with unique ID to prevent widget reuse issues
       _messages.add(Message(
-        id: 'welcome',
+        id: 'welcome_$_currentSessionId',
         text: 'Hello! I\'m Nyxra AI. How can I help you today?',
         isUser: false,
         timestamp: DateTime.now(),
         sessionId: _currentSessionId,
       ));
     });
+    _scrollToBottom();
   }
 
 
