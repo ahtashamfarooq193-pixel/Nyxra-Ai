@@ -185,7 +185,6 @@ class _ChatScreenState extends State<ChatScreen> {
         sessionId: _currentSessionId,
       ));
     });
-    _scrollToBottom();
   }
 
 
@@ -1063,8 +1062,8 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: Icons.chat_bubble_outline_rounded,
             label: 'New Chat',
             onTap: () {
-              Navigator.pop(context);
               _startNewChat();
+              Navigator.pop(context);
             },
           ),
         ],
