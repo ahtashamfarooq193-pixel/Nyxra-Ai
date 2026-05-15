@@ -358,73 +358,76 @@ class MessageBubble extends StatelessWidget {
 class _CopyableCodeBuilder extends MarkdownElementBuilder {
   @override
   Widget? visitElementAfter(element, TextStyle? preferredStyle) {
-    final code = element.textContent;
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0D1117),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Text(
-                code,
-                style: GoogleFonts.firaCode(
-                  fontSize: 13,
-                  color: AppConstants.primaryColor,
-                ),
-              ),
-            ),
-          ),
-          // Individual COPY button for each code block
-          Builder(
-            builder: (context) => InkWell(
-              onTap: () async {
-                await Clipboard.setData(ClipboardData(text: code.trim()));
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('✅ Copied to clipboard!',
-                          style: GoogleFonts.inter(fontSize: 13)),
-                      backgroundColor: AppConstants.primaryColor,
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 1),
-                    ),
-                  );
-                }
-              },
-              borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
+    final code = element.textContent.trim();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: UnconstrainedBox(
+        alignment: Alignment.centerLeft,
+        child: InkWell(
+          onTap: () => Clipboard.setData(ClipboardData(text: code)),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 44),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E2746), // Slightly lighter than background
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppConstants.primaryColor.withOpacity(0.3)),
+              boxShadow: [
+                BoxShadow(
                   color: AppConstants.primaryColor.withOpacity(0.1),
-                  border: Border(left: BorderSide(color: Colors.white12)),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.copy_rounded,
-                        size: 16, color: AppConstants.primaryColor),
-                    const SizedBox(height: 4),
-                    Text('Copy', 
-                      style: GoogleFonts.inter(
-                        fontSize: 10, 
+              ],
+            ),
+            child: IntrinsicWidth(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      code,
+                      style: GoogleFonts.firaCode(
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: AppConstants.primaryColor
-                      )
+                        color: Colors.white,
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                  Builder(
+                    builder: (context) => InkWell(
+                      onTap: () async {
+                        await Clipboard.setData(ClipboardData(text: code));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('✅ Copied: $code',
+                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                              backgroundColor: AppConstants.primaryColor,
+                              behavior: SnackBarBehavior.floating,
+                              width: 200,
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppConstants.primaryColor.withOpacity(0.2),
+                          borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)),
+                        ),
+                        child: const Icon(Icons.copy_all_rounded,
+                            size: 18, color: AppConstants.primaryColor),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
