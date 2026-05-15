@@ -174,6 +174,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted) return;
     setState(() {
       _messages.clear();
+      _isLoading = false; // Reset loading state!
       _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
       
       // Add welcome message with unique ID to prevent widget reuse issues
@@ -487,6 +488,9 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       await for (final chunk in stream) {
+        if (!mounted) break;
+        if (_currentSessionId != aiMessage.sessionId) break; // User switched chats
+
         if (isFirstChunk) {
           setState(() {
             _messages.add(aiMessage);
@@ -524,28 +528,30 @@ class _ChatScreenState extends State<ChatScreen> {
         _scrollToBottom();
       }
 
-      // Mark as delivered and save
-      _updateMessageStatus(aiMessageId, MessageStatus.delivered);
-      _saveMessages();
-      _syncMessageToCloud(aiMessage);
+      if (_currentSessionId == aiMessage.sessionId) {
+        // Mark as delivered and save
+        _updateMessageStatus(aiMessageId, MessageStatus.delivered);
+        _saveMessages();
+        _syncMessageToCloud(aiMessage);
 
-      if (_isVoiceEnabled || isVoiceInput) {
-        _flutterTts.speak(_prepareTextForSpeech(aiMessage.text));
+        if (_isVoiceEnabled || isVoiceInput) {
+          _flutterTts.speak(_prepareTextForSpeech(aiMessage.text));
+        }
+
+        // 2. Token Deduction
+        _deductTokens(aiMessage.text);
       }
-
-      // 2. Token Deduction
-      _deductTokens(aiMessage.text);
 
     } catch (e) {
       print('ChatScreen Streaming Error: $e');
-      if (isFirstChunk) {
+      if (isFirstChunk && _currentSessionId == aiMessage.sessionId) {
         _addMessage(
           text: '❌ **Service Error:** AI is temporarily unreachable. Please try again in a moment.',
           isUser: false,
         );
       }
     } finally {
-      if (mounted) {
+      if (mounted && _currentSessionId == aiMessage.sessionId) {
         setState(() {
           _isLoading = false;
         });
