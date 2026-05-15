@@ -71,7 +71,7 @@ class ChatService {
       yield '❌ **Timeout Error:** The server is taking too long to respond. Please check your connection.';
     } catch (e) {
       print('ChatService Error: $e');
-      yield '❌ **Connection Error:** Failed to connect to Nyxra AI service. Please check if the backend is running.';
+      yield '❌ **Connection Error:** Failed to connect to AI service. Detail: ${e.toString().split('\n')[0]}';
     }
   }
 

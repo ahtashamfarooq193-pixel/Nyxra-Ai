@@ -28,49 +28,77 @@ app.get("/health", (req, res) => {
 app.post("/api/chat", async (req, res) => {
   try {
     const { userMessage, conversationHistory, imageBase64 } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      return res.status(500).json({ error: "Gemini API Key missing on server." });
-    }
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
-    // Prepare contents
-    const contents = conversationHistory.slice(-10).map(msg => ({
-      role: msg.isUser ? "user" : "model",
-      parts: [{ text: msg.text }]
-    }));
-
-    // Add current message
-    const currentParts = [{ text: userMessage }];
-    if (imageBase64) {
-      currentParts.push({
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: imageBase64
+    // --- TRY GEMINI FIRST ---
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+        const contents = conversationHistory.slice(-10).map(msg => ({
+          role: msg.isUser ? "user" : "model",
+          parts: [{ text: msg.text }]
+        }));
+        const currentParts = [{ text: userMessage }];
+        if (imageBase64) {
+          currentParts.push({ inlineData: { mimeType: "image/jpeg", data: imageBase64 } });
         }
-      });
+        contents.push({ role: "user", parts: currentParts });
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents, systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] } })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (aiText) return res.json({ text: aiText });
+        }
+      } catch (geminiError) {
+        console.error("Gemini failed, trying Groq...", geminiError.message);
+      }
     }
-    contents.push({ role: "user", parts: currentParts });
 
-    const payload = {
-      contents,
-      systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] }
-    };
+    // --- FALLBACK TO GROQ ---
+    const groqKeys = (process.env.GROQ_API_KEYS || "").split(",").map(k => k.trim()).filter(Boolean);
+    if (groqKeys.length > 0) {
+      const groqUrl = "https://api.groq.com/openai/v1/chat/completions";
+      const messages = [
+        { role: "system", content: SYSTEM_INSTRUCTION },
+        ...conversationHistory.slice(-10).map(msg => ({
+          role: msg.isUser ? "user" : "assistant",
+          content: msg.text
+        })),
+        { role: "user", content: userMessage }
+      ];
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+      for (const key of groqKeys) {
+        try {
+          const response = await fetch(groqUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
+            body: JSON.stringify({
+              model: imageBase64 ? "llama-3.2-11b-vision-preview" : "llama-3.3-70b-versatile",
+              messages,
+              max_tokens: 1024
+            })
+          });
 
-    const data = await response.json();
-    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that.";
+          if (response.ok) {
+            const data = await response.json();
+            const aiText = data.choices?.[0]?.message?.content;
+            if (aiText) return res.json({ text: aiText });
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    }
 
-    res.json({ text: aiText });
+    res.status(503).json({ error: "AI service is temporarily unavailable. All providers failed." });
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Critical Error:", error);
     res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
 });

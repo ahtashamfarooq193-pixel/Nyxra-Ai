@@ -539,7 +539,7 @@ class _ChatScreenState extends State<ChatScreen> {
       print('ChatScreen Streaming Error: $e');
       if (isFirstChunk) {
         _addMessage(
-          text: '❌ **Connection Error:** Failed to connect to Groq. Please try again.',
+          text: '❌ **Service Error:** AI is temporarily unreachable. Please try again in a moment.',
           isUser: false,
         );
       }
