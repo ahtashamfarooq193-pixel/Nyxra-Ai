@@ -96,6 +96,7 @@ class MessageBubble extends StatelessWidget {
                   // ─── Text / Markdown ───
                   MarkdownBody(
                     data: message.text,
+                    selectable: true, // Enable native text selection on long press!
                     styleSheet: MarkdownStyleSheet(
                       p: GoogleFonts.inter(
                         fontSize: 15,
@@ -361,37 +362,40 @@ class _CopyableCodeBuilder extends MarkdownElementBuilder {
     final code = element.textContent.trim();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: UnconstrainedBox(
+      child: Align(
         alignment: Alignment.centerLeft,
-        child: InkWell(
-          onTap: () => Clipboard.setData(ClipboardData(text: code)),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 44),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E2746), // Slightly lighter than background
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppConstants.primaryColor.withOpacity(0.3)),
-              boxShadow: [
-                BoxShadow(
-                  color: AppConstants.primaryColor.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: IntrinsicWidth(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => Clipboard.setData(ClipboardData(text: code)),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 44),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E2746), // Slightly lighter than background
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppConstants.primaryColor.withOpacity(0.3)),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppConstants.primaryColor.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      code,
-                      style: GoogleFonts.firaCode(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      child: SelectableText(
+                        code,
+                        style: GoogleFonts.firaCode(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -413,7 +417,7 @@ class _CopyableCodeBuilder extends MarkdownElementBuilder {
                         }
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         decoration: BoxDecoration(
                           color: AppConstants.primaryColor.withOpacity(0.2),
                           borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)),
