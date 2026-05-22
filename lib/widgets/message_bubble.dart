@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/message.dart';
 import '../utils/constants.dart';
+import 'package:flutter/gestures.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -37,7 +38,12 @@ class MessageBubble extends StatelessWidget {
             message.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           GestureDetector(
-            onLongPress: () => _showActions(context, canEdit),
+            onSecondaryTapDown: kIsWeb ? (details) => _showActionsAtPosition(
+              context, 
+              canEdit, 
+              details.globalPosition
+            ) : null,
+            onLongPress: !kIsWeb ? () => _showActions(context, canEdit) : null,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
@@ -64,23 +70,26 @@ class MessageBubble extends StatelessWidget {
                   if (message.isUser && message.imagePath != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: message.imagePath!.startsWith('data:image')
-                            ? Image.memory(
-                                base64Decode(message.imagePath!.split(',')[1]),
-                                height: 200,
-                                width: double.infinity,
-                                fit: BoxFit.contain,
-                              )
-                            : Image.network(
-                                message.imagePath!,
-                                height: 200,
-                                fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    const Icon(Icons.broken_image,
-                                        color: Colors.white24),
-                              ),
+                      child: GestureDetector(
+                        onLongPress: () => _showActions(context, canEdit),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: message.imagePath!.startsWith('data:image')
+                              ? Image.memory(
+                                  base64Decode(message.imagePath!.split(',')[1]),
+                                  height: 200,
+                                  width: double.infinity,
+                                  fit: BoxFit.contain,
+                                )
+                              : Image.network(
+                                  message.imagePath!,
+                                  height: 200,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const Icon(Icons.broken_image,
+                                          color: Colors.white24),
+                                ),
+                        ),
                       ),
                     ),
 
@@ -88,15 +97,18 @@ class MessageBubble extends StatelessWidget {
                   if (!message.isUser &&
                       message.imagePath != null &&
                       message.imagePath!.startsWith('data:image'))
-                    _buildGeneratedImage(
-                        context,
-                        message.imagePath!.substring(
-                            message.imagePath!.indexOf(',') + 1)),
+                    GestureDetector(
+                      onLongPress: () => _showActions(context, canEdit),
+                      child: _buildGeneratedImage(
+                          context,
+                          message.imagePath!.substring(
+                              message.imagePath!.indexOf(',') + 1)),
+                    ),
 
-                  // ─── Text / Markdown ───
+                  // ─── Text / Markdown - WITH SELECTION & LONG PRESS MENU ───
                   MarkdownBody(
                     data: message.text,
-                    selectable: true, // Enable native text selection on long press!
+                    selectable: true, // ✅ Enable native text selection on long press!
                     styleSheet: MarkdownStyleSheet(
                       p: GoogleFonts.inter(
                         fontSize: 15,
@@ -119,6 +131,9 @@ class MessageBubble extends StatelessWidget {
                     ),
                     builders: {
                       'code': _CopyableCodeBuilder(),
+                    },
+                    onTapLink: (text, href, title) {
+                      // Handle links if needed
                     },
                   ),
                 ],
@@ -345,6 +360,70 @@ class MessageBubble extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  void _showActionsAtPosition(BuildContext context, bool canEdit, Offset position) {
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    
+    showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        overlay.size.width - position.dx,
+        overlay.size.height - position.dy,
+      ),
+      items: [
+        PopupMenuItem(
+          child: Row(
+            children: [
+              const Icon(Icons.copy_rounded, color: Colors.white),
+              const SizedBox(width: 12),
+              const Text('Copy Message', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+          onTap: () => onCopy?.call(message),
+        ),
+        if (!message.isUser &&
+            message.imagePath != null &&
+            message.imagePath!.startsWith('data:image'))
+          PopupMenuItem(
+            child: Row(
+              children: [
+                const Icon(Icons.download_rounded, color: Colors.white),
+                const SizedBox(width: 12),
+                const Text('Save Image', style: TextStyle(color: Colors.white)),
+              ],
+            ),
+            onTap: () => _downloadImage(
+                context,
+                message.imagePath!.substring(
+                    message.imagePath!.indexOf(',') + 1)),
+          ),
+        if (canEdit)
+          PopupMenuItem(
+            child: Row(
+              children: [
+                const Icon(Icons.edit_rounded, color: Colors.white),
+                const SizedBox(width: 12),
+                const Text('Edit Message', style: TextStyle(color: Colors.white)),
+              ],
+            ),
+            onTap: () => onEdit?.call(message),
+          ),
+        PopupMenuItem(
+          child: Row(
+            children: [
+              const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+              const SizedBox(width: 12),
+              const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+            ],
+          ),
+          onTap: () => onDelete?.call(message),
+        ),
+      ],
+      color: AppConstants.surfaceColor,
     );
   }
 
