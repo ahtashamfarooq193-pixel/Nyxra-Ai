@@ -58,29 +58,29 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCA0xgr97lpmHoJ4NqVB4V6Tm3xZRKZcaE',
-    appId: '1:1010258908680:ios:replace_this',
-    messagingSenderId: '1010258908680',
-    projectId: 'mychatgpt-95a59',
-    storageBucket: 'mychatgpt-95a59.firebasestorage.app',
-    iosBundleId: 'com.example.myChatgpt',
+    apiKey: 'AIzaSyDX80rl_PnrFrg0yDFjdfvjO_JjgrVa6Nw',
+    appId: '1:153476063751:ios:181f19636c516cba07c0a2',
+    messagingSenderId: '153476063751',
+    projectId: 'nyxra-ai-shamii',
+    storageBucket: 'nyxra-ai-shamii.firebasestorage.app',
+    iosBundleId: 'com.nyxra.ai',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyCA0xgr97lpmHoJ4NqVB4V6Tm3xZRKZcaE',
-    appId: '1:1010258908680:ios:replace_this',
-    messagingSenderId: '1010258908680',
-    projectId: 'mychatgpt-95a59',
-    storageBucket: 'mychatgpt-95a59.firebasestorage.app',
-    iosBundleId: 'com.example.myChatgpt',
+    apiKey: 'AIzaSyDX80rl_PnrFrg0yDFjdfvjO_JjgrVa6Nw',
+    appId: '1:153476063751:ios:181f19636c516cba07c0a2',
+    messagingSenderId: '153476063751',
+    projectId: 'nyxra-ai-shamii',
+    storageBucket: 'nyxra-ai-shamii.firebasestorage.app',
+    iosBundleId: 'com.nyxra.ai',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyCA0xgr97lpmHoJ4NqVB4V6Tm3xZRKZcaE',
-    appId: '1:1010258908680:web:replace_this',
-    messagingSenderId: '1010258908680',
-    projectId: 'mychatgpt-95a59',
-    authDomain: 'mychatgpt-95a59.firebaseapp.com',
-    storageBucket: 'mychatgpt-95a59.firebasestorage.app',
+    apiKey: 'AIzaSyDX80rl_PnrFrg0yDFjdfvjO_JjgrVa6Nw',
+    appId: '1:153476063751:web:181f19636c516cba07c0a2',
+    messagingSenderId: '153476063751',
+    projectId: 'nyxra-ai-shamii',
+    authDomain: 'nyxra-ai-shamii.firebaseapp.com',
+    storageBucket: 'nyxra-ai-shamii.firebasestorage.app',
   );
 }
