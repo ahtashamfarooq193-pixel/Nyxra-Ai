@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'screens/chat_screen.dart';
 import 'utils/constants.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 class Splashscreen extends StatefulWidget {
   const Splashscreen({super.key});
@@ -17,8 +13,6 @@ class Splashscreen extends StatefulWidget {
 class _SplashscreenState extends State<Splashscreen> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
-  bool _showLoginOptions = false;
-  bool _isAuthenticating = false;
 
   @override
   void initState() {
@@ -38,94 +32,14 @@ class _SplashscreenState extends State<Splashscreen> with SingleTickerProviderSt
     // Always wait at least 2.5 seconds to show the branding
     await Future.delayed(const Duration(milliseconds: 2500));
 
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      
-      if (user != null) {
-        _navigateToChat();
-      } else {
-        if (mounted) {
-          setState(() {
-            _showLoginOptions = true;
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _showLoginOptions = true;
-        });
-      }
-    }
-  }
-
-  void _navigateToChat() {
+    // No forced sign-in here — the app is usable as a guest right away.
+    // Signing in is offered contextually inside the chat screen (drawer /
+    // menu) only when the user actually wants synced history or tokens.
     if (mounted) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const ChatScreen()),
       );
-    }
-  }
-
-  Future<void> _handleGoogleSignIn() async {
-    if (_isAuthenticating) return;
-    
-    setState(() => _isAuthenticating = true);
-    
-    try {
-      if (kIsWeb) {
-        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-        await FirebaseAuth.instance.signInWithPopup(googleProvider);
-        _navigateToChat();
-        return;
-      }
-
-      final GoogleSignIn googleSignIn = GoogleSignIn();
-      
-      // Clean previous sign-in state to avoid stale sessions
-      await googleSignIn.signOut();
-      
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      
-      if (googleUser == null) {
-        // User cancelled the sign-in
-        if (mounted) setState(() => _isAuthenticating = false);
-        return;
-      }
-
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final AuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      await FirebaseAuth.instance.signInWithCredential(credential);
-      
-      _navigateToChat();
-    } catch (e) {
-      print('SIGN-IN ERROR: $e');
-      if (mounted) {
-        String errorMsg = 'Sign in failed. Please try again.';
-        if (e.toString().contains('People API')) {
-          errorMsg = 'Setup incomplete: Please enable People API in Google Console and wait 5 minutes.';
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: Colors.redAccent,
-            duration: const Duration(seconds: 5),
-            action: SnackBarAction(
-              label: 'Retry',
-              textColor: Colors.white,
-              onPressed: _handleGoogleSignIn,
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isAuthenticating = false);
     }
   }
 
@@ -157,7 +71,7 @@ class _SplashscreenState extends State<Splashscreen> with SingleTickerProviderSt
               ],
             ),
           ),
-          
+
           // Content
           Center(
             child: FadeTransition(
@@ -187,108 +101,25 @@ class _SplashscreenState extends State<Splashscreen> with SingleTickerProviderSt
                       letterSpacing: 4,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 60),
 
-                  // Show circle only when NOT showing login options AND NOT authenticating
-                  if (!_showLoginOptions && !_isAuthenticating)
-                    SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AppConstants.primaryColor.withOpacity(0.8),
-                        ),
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppConstants.primaryColor.withOpacity(0.8),
                       ),
-                    )
-                  else if (_showLoginOptions)
-                    _buildLoginUI(),
-                  
-                  if (_isAuthenticating)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 20),
-                      child: CircularProgressIndicator(color: AppConstants.primaryColor),
                     ),
+                  ),
                 ],
               ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildLoginUI() {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: _handleGoogleSignIn,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 15,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Image.asset(
-              'assets/images/google_logo.png',
-              height: 48,
-              width: 48,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(
-                  Icons.account_circle,
-                  size: 48,
-                  color: AppConstants.primaryColor,
-                );
-              },
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          'Sign up or Log in',
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            color: Colors.white.withOpacity(0.7),
-            fontWeight: FontWeight.w500,
-            letterSpacing: 1.2,
-          ),
-        ),
-        if (kIsWeb) ...[
-          const SizedBox(height: 60),
-          OutlinedButton.icon(
-            onPressed: () async {
-              final Uri url = Uri.parse('https://drive.google.com/drive/folders/1FJ-Qp_SPkTmXM_zgAkCpbYZrLM5WoXgd');
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url, mode: LaunchMode.externalApplication);
-              }
-            },
-            icon: const Icon(Icons.android, color: Colors.white, size: 18),
-            label: Text(
-              'Download Android App',
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: Colors.white.withOpacity(0.3)),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-            ),
-          ),
-        ],
-      ],
     );
   }
 }

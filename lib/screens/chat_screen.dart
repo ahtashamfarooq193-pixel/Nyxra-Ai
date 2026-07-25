@@ -40,6 +40,7 @@ class _ChatScreenState extends State<ChatScreen> {
   int _userTokens = 5000;
   List<Message> _allHistoryMessages = [];
   bool _isHistoryLoading = false;
+  bool _isSigningIn = false;
 
   @override
   void initState() {
@@ -487,6 +488,70 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    if (_isSigningIn) return;
+    setState(() => _isSigningIn = true);
+
+    try {
+      if (kIsWeb) {
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        await FirebaseAuth.instance.signInWithPopup(googleProvider);
+      } else {
+        final GoogleSignIn googleSignIn = GoogleSignIn();
+        await googleSignIn.signOut(); // clear stale sessions
+        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+        if (googleUser == null) {
+          if (mounted) setState(() => _isSigningIn = false);
+          return; // user cancelled
+        }
+        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+        final AuthCredential credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+        await FirebaseAuth.instance.signInWithCredential(credential);
+      }
+
+      if (!mounted) return;
+      setState(() => _currentUserUid = FirebaseAuth.instance.currentUser?.uid);
+      _loadUserTokens();
+      _refreshHistory();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Signed in — your tokens and history will now sync.',
+                style: GoogleFonts.inter()),
+            backgroundColor: AppConstants.successColor,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      print('SIGN-IN ERROR: $e');
+      if (mounted) {
+        String errorMsg = 'Sign in failed. Please try again.';
+        if (e.toString().contains('People API')) {
+          errorMsg = 'Setup incomplete: Please enable People API in Google Console and wait 5 minutes.';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: AppConstants.errorColor,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _handleGoogleSignIn,
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSigningIn = false);
+    }
+  }
+
   Future<void> _handleLogout() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -707,6 +772,8 @@ class _ChatScreenState extends State<ChatScreen> {
               _confirmClearChat();
             } else if (value == 'logout') {
               _handleLogout();
+            } else if (value == 'login') {
+              _handleGoogleSignIn();
             }
           },
           itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -720,16 +787,28 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
-            const PopupMenuItem<String>(
-              value: 'logout',
-              child: Row(
-                children: [
-                  Icon(Icons.logout, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text('Sign Out'),
-                ],
+            if (_currentUserUid != null)
+              const PopupMenuItem<String>(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text('Sign Out'),
+                  ],
+                ),
+              )
+            else
+              const PopupMenuItem<String>(
+                value: 'login',
+                child: Row(
+                  children: [
+                    Icon(Icons.login, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text('Sign In'),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ],
@@ -1009,60 +1088,75 @@ class _ChatScreenState extends State<ChatScreen> {
     final user = FirebaseAuth.instance.currentUser;
     final displayName = user?.displayName ?? 'Guest User';
     final email = user?.email ?? 'Nyxra AI Free Tier';
+    final bool isGuest = _currentUserUid == null;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppConstants.surfaceOverlay,
-        border: Border(top: BorderSide(color: AppConstants.borderColor)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppConstants.primaryColor.withOpacity(0.3), width: 1.5),
+    return InkWell(
+      onTap: isGuest ? _handleGoogleSignIn : null,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppConstants.surfaceOverlay,
+          border: Border(top: BorderSide(color: AppConstants.borderColor)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppConstants.primaryColor.withOpacity(0.3), width: 1.5),
+              ),
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: AppConstants.primaryColor.withOpacity(0.1),
+                child: _isSigningIn
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.person_rounded, color: Colors.white, size: 20),
+              ),
             ),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: AppConstants.primaryColor.withOpacity(0.1),
-              child: const Icon(Icons.person_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    isGuest ? 'Guest User' : displayName,
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    isGuest
+                        ? (_isSigningIn ? 'Signing in...' : 'Tap to sign in & sync')
+                        : email,
+                    style: GoogleFonts.inter(
+                      color: isGuest ? AppConstants.primaryColor : AppConstants.faintTextColor,
+                      fontSize: 11,
+                      fontWeight: isGuest ? FontWeight.w500 : FontWeight.normal,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'v1.0.1 - Nyxra AI',
+                    style: GoogleFonts.inter(
+                      color: Colors.white10,
+                      fontSize: 9,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _currentUserUid != null ? displayName : 'Guest User',
-                  style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  _currentUserUid != null ? email : 'Nyxra AI Free Tier',
-                  style: GoogleFonts.inter(
-                    color: AppConstants.faintTextColor,
-                    fontSize: 11,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'v1.0.1 - Nyxra AI',
-                  style: GoogleFonts.inter(
-                    color: Colors.white10,
-                    fontSize: 9,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+            if (isGuest && !_isSigningIn)
+              const Icon(Icons.chevron_right_rounded, color: AppConstants.faintTextColor, size: 20),
+          ],
+        ),
       ),
     );
   }

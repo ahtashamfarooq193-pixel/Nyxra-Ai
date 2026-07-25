@@ -38,12 +38,16 @@ class MessageBubble extends StatelessWidget {
             message.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           GestureDetector(
+            // Only right-click (web) opens the actions menu here — long-press is
+            // intentionally left free so it triggers native text selection
+            // (drag handles + system Copy toolbar) instead of stealing the
+            // gesture. Copy/Edit/Delete are still always reachable via the
+            // action row below, and via long-press on attached images.
             onSecondaryTapDown: kIsWeb ? (details) => _showActionsAtPosition(
-              context, 
-              canEdit, 
+              context,
+              canEdit,
               details.globalPosition
             ) : null,
-            onLongPress: !kIsWeb ? () => _showActions(context, canEdit) : null,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
