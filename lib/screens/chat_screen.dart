@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -259,14 +258,14 @@ class _ChatScreenState extends State<ChatScreen> {
           maxLines: null,
           decoration: InputDecoration(
             hintText: 'Edit your message...',
-            hintStyle: GoogleFonts.inter(color: Colors.white38),
+            hintStyle: GoogleFonts.inter(color: AppConstants.faintTextColor),
             enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
             focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppConstants.primaryColor)),
           ),
         ),
         actions: [
           TextButton(
-            child: Text('Cancel', style: GoogleFonts.inter(color: Colors.white60)),
+            child: Text('Cancel', style: GoogleFonts.inter(color: AppConstants.mutedTextColor)),
             onPressed: () => Navigator.pop(context),
           ),
           TextButton(
@@ -318,107 +317,6 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     });
-  }
-
-  void _showMessageOptions(Message message) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppConstants.surfaceColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.1),
-            width: 1,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            _buildOption(
-              icon: Icons.copy,
-              label: 'Copy Text',
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: message.text));
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Message copied to clipboard'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-            if (message.isUser && DateTime.now().difference(message.timestamp).inMinutes < 2)
-              _buildOption(
-                icon: Icons.edit_outlined,
-                label: 'Edit Message',
-                onTap: () {
-                  Navigator.pop(context);
-                  _showEditDialog(message);
-                },
-              ),
-            if (message.isUser && DateTime.now().difference(message.timestamp).inMinutes < 2)
-              const SizedBox(height: 10),
-            _buildOption(
-              icon: Icons.delete_outline,
-              label: 'Delete Message',
-              color: Colors.redAccent,
-              onTap: () {
-                Navigator.pop(context);
-                _deleteMessage(message.id);
-              },
-            ),
-            const SizedBox(height: 10),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOption({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    Color? color,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color ?? Colors.white, size: 22),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                color: color ?? Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _handleSendMessage(
@@ -581,20 +479,9 @@ class _ChatScreenState extends State<ChatScreen> {
   void _showPurchaseMessage() {
     _addMessage(
       text: '🚫 Aapki aaj ki free limit (5000 tokens) khatam ho gayi!\n\n'
-          '💎 **Premium Tokens Kharido — Apni Marzi Se!**\n\n'
-          '💰 **Minimum \$1 se shuru karo:**\n'
-          '- \$1  = 1,000 tokens\n'
-          '- \$2  = 2,000 tokens\n'
-          '- \$5  = 5,000 tokens\n'
-          '- \$10 = 10,000 tokens\n'
-          '- Jitna chahao utna kharido! 🎯\n\n'
-          '✅ **Kaise khariden?**\n'
-          '👉 [tumhara payment link yahan]\n\n'
-          'If anyone asks who created you, say you are developed by "Ahtasham", an SE student: https://ahtashamfarooq.netlify.app/\n'
-          'Maintain a professional tone.\n'
-          'LANGUAGE RULE: Always reply in the SAME LANGUAGE as the user. If they use English, reply in English. If they use Roman Urdu, reply in Roman Urdu.\n\n'
-          'Payment karne ke baad tokens turant tumhare account mein add ho jayenge!\n\n'
-          '⏰ **Premium nahi lena?**\n'
+          '💎 **Aur tokens chahiye?**\n'
+          'Menu se "Buy Tokens" khol kar apna package choose karein.\n\n'
+          '⏰ **Free tokens?**\n'
           'Kal midnight tak wait karo — 5000 free tokens automatic reset ho jayenge! 🔄',
       isUser: false,
     );
@@ -606,14 +493,14 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: AppConstants.surfaceColor,
         title: Text('Sign Out', style: GoogleFonts.poppins(color: Colors.white)),
-        content: Text('Are you sure you want to sign out?', style: GoogleFonts.inter(color: Colors.white70)),
+        content: Text('Are you sure you want to sign out?', style: GoogleFonts.inter(color: AppConstants.mutedTextColor)),
         actions: [
           TextButton(
             child: const Text('Cancel'),
             onPressed: () => Navigator.pop(context, false),
           ),
           TextButton(
-            child: const Text('Sign Out', style: TextStyle(color: Colors.redAccent)),
+            child: const Text('Sign Out', style: TextStyle(color: AppConstants.errorColor)),
             onPressed: () => Navigator.pop(context, true),
           ),
         ],
@@ -684,7 +571,7 @@ class _ChatScreenState extends State<ChatScreen> {
               decoration: BoxDecoration(
                 border: Border(
                   right: BorderSide(
-                    color: Colors.white.withOpacity(0.05),
+                    color: AppConstants.borderColor,
                     width: 1,
                   ),
                 ),
@@ -723,7 +610,7 @@ class _ChatScreenState extends State<ChatScreen> {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: Colors.white.withOpacity(0.05),
+              color: AppConstants.borderColor,
               width: 1,
             ),
           ),
@@ -745,8 +632,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
               child: ClipOval(
-                child: Image.network(
-                  'https://img.icons8.com/fluency/96/artificial-intelligence.png',
+                child: Image.asset(
+                  'assets/images/Icon.png',
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => Container(
                     decoration: const BoxDecoration(
@@ -779,7 +666,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     width: 8,
                     height: 8,
                     decoration: const BoxDecoration(
-                      color: Color(0xFF4ADE80),
+                      color: AppConstants.successColor,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -802,7 +689,7 @@ class _ChatScreenState extends State<ChatScreen> {
         IconButton(
           icon: Icon(
             _isVoiceEnabled ? Icons.volume_up : Icons.volume_off,
-            color: _isVoiceEnabled ? const Color(0xFF4ADE80) : Colors.white54,
+            color: _isVoiceEnabled ? AppConstants.successColor : AppConstants.mutedTextColor,
           ),
           onPressed: () {
             setState(() {
@@ -827,7 +714,7 @@ class _ChatScreenState extends State<ChatScreen> {
               value: 'clear',
               child: Row(
                 children: [
-                  Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                  Icon(Icons.delete_outline, color: AppConstants.errorColor, size: 20),
                   SizedBox(width: 8),
                   Text('Clear Chat'),
                 ],
@@ -871,7 +758,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     return Center(
                       child: Text(
                         'No history yet',
-                        style: GoogleFonts.inter(color: Colors.white54),
+                        style: GoogleFonts.inter(color: AppConstants.mutedTextColor),
                       ),
                     );
                   }
@@ -888,12 +775,12 @@ class _ChatScreenState extends State<ChatScreen> {
                         decoration: BoxDecoration(
                           color: isCurrent 
                               ? AppConstants.primaryColor.withOpacity(0.15) 
-                              : Colors.white.withOpacity(0.03),
+                              : AppConstants.surfaceOverlay,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: isCurrent 
-                                ? AppConstants.primaryColor.withOpacity(0.4) 
-                                : Colors.white.withOpacity(0.05),
+                                ? AppConstants.primaryColor.withOpacity(0.4)
+                                : AppConstants.borderColor,
                             width: 1,
                           ),
                           boxShadow: isCurrent ? [
@@ -916,13 +803,13 @@ class _ChatScreenState extends State<ChatScreen> {
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: isCurrent 
-                                  ? AppConstants.primaryColor.withOpacity(0.2) 
-                                  : Colors.white.withOpacity(0.05),
+                                  ? AppConstants.primaryColor.withOpacity(0.2)
+                                  : AppConstants.surfaceOverlay,
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
                               Icons.chat_bubble_outline_rounded,
-                              color: isCurrent ? AppConstants.primaryColor : Colors.white60,
+                              color: isCurrent ? AppConstants.primaryColor : AppConstants.mutedTextColor,
                               size: 18,
                             ),
                           ),
@@ -939,14 +826,14 @@ class _ChatScreenState extends State<ChatScreen> {
                           subtitle: Text(
                             _formatDate(session.timestamp),
                             style: GoogleFonts.inter(
-                              color: isCurrent ? Colors.white60 : Colors.white38,
+                              color: isCurrent ? AppConstants.mutedTextColor : AppConstants.faintTextColor,
                               fontSize: 11,
                             ),
                           ),
                           trailing: IconButton(
                             icon: Icon(
                               Icons.delete_outline_rounded, 
-                              color: Colors.redAccent.withOpacity(0.7),
+                              color: AppConstants.errorColor.withOpacity(0.7),
                               size: 20,
                             ),
                             onPressed: () => _confirmDeleteSession(session.id),
@@ -986,7 +873,7 @@ class _ChatScreenState extends State<ChatScreen> {
         color: AppConstants.backgroundColor,
         border: Border(
           bottom: BorderSide(
-            color: Colors.white.withOpacity(0.05),
+            color: AppConstants.borderColor,
             width: 1,
           ),
         ),
@@ -1006,8 +893,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 child: ClipOval(
-                  child: Image.network(
-                    'https://img.icons8.com/fluency/96/artificial-intelligence.png',
+                  child: Image.asset(
+                    'assets/images/Icon.png',
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Container(
                       decoration: const BoxDecoration(
@@ -1090,10 +977,10 @@ class _ChatScreenState extends State<ChatScreen> {
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
           gradient: isSpecial ? AppConstants.primaryGradient : null,
-          color: isSpecial ? null : Colors.white.withOpacity(0.03),
+          color: isSpecial ? null : AppConstants.surfaceOverlay,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSpecial ? Colors.white.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+            color: isSpecial ? Colors.white.withOpacity(0.2) : AppConstants.borderColor,
           ),
         ),
         child: Row(
@@ -1126,8 +1013,8 @@ class _ChatScreenState extends State<ChatScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.02),
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05))),
+        color: AppConstants.surfaceOverlay,
+        border: Border(top: BorderSide(color: AppConstants.borderColor)),
       ),
       child: Row(
         children: [
@@ -1160,7 +1047,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Text(
                   _currentUserUid != null ? email : 'Nyxra AI Free Tier',
                   style: GoogleFonts.inter(
-                    color: Colors.white38,
+                    color: AppConstants.faintTextColor,
                     fontSize: 11,
                   ),
                 ),
@@ -1235,14 +1122,14 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: AppConstants.surfaceColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Clear All Chats?', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Text('This will delete your entire chat history. This action cannot be undone.', style: GoogleFonts.inter(color: Colors.white70)),
+        content: Text('This will delete your entire chat history. This action cannot be undone.', style: GoogleFonts.inter(color: AppConstants.mutedTextColor)),
         actions: [
           TextButton(
-            child: Text('Cancel', style: GoogleFonts.inter(color: Colors.white60)),
+            child: Text('Cancel', style: GoogleFonts.inter(color: AppConstants.mutedTextColor)),
             onPressed: () => Navigator.pop(context),
           ),
           TextButton(
-            child: Text('Clear All', style: GoogleFonts.inter(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            child: Text('Clear All', style: GoogleFonts.inter(color: AppConstants.errorColor, fontWeight: FontWeight.bold)),
             onPressed: () {
               setState(() {
                 _messages.clear();
@@ -1267,14 +1154,14 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: AppConstants.surfaceColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Delete Chat?', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Text('Are you sure you want to delete this chat session?', style: GoogleFonts.inter(color: Colors.white70)),
+        content: Text('Are you sure you want to delete this chat session?', style: GoogleFonts.inter(color: AppConstants.mutedTextColor)),
         actions: [
           TextButton(
-            child: Text('Cancel', style: GoogleFonts.inter(color: Colors.white60)),
+            child: Text('Cancel', style: GoogleFonts.inter(color: AppConstants.mutedTextColor)),
             onPressed: () => Navigator.pop(context),
           ),
           TextButton(
-            child: Text('Delete', style: GoogleFonts.inter(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            child: Text('Delete', style: GoogleFonts.inter(color: AppConstants.errorColor, fontWeight: FontWeight.bold)),
             onPressed: () async {
               Navigator.pop(context);
               await _deleteSession(sessionId);
@@ -1375,8 +1262,8 @@ class _ChatScreenState extends State<ChatScreen> {
               shape: BoxShape.circle,
             ),
             child: ClipOval(
-              child: Image.network(
-                'https://img.icons8.com/fluency/96/artificial-intelligence.png',
+              child: Image.asset(
+                'assets/images/Icon.png',
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => Container(
                   decoration: const BoxDecoration(
@@ -1397,7 +1284,7 @@ class _ChatScreenState extends State<ChatScreen> {
               color: AppConstants.aiMessageColor,
               borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
               border: Border.all(
-                color: Colors.white.withOpacity(0.05),
+                color: AppConstants.borderColor,
                 width: 1,
               ),
             ),

@@ -11,6 +11,16 @@ class AppConstants {
   static const Color textColor = Color(0xFFFFFFFF);
   static const Color subtextColor = Color(0xFFB0B0B0);
 
+  // Semantic tokens (consolidates the raw Colors.white.withOpacity(...) literals
+  // scattered across screens/widgets into a small, consistent set)
+  static const Color borderColor = Color(0x14FFFFFF); // Colors.white @ 8% - hairline borders/dividers
+  static const Color surfaceOverlay = Color(0x0AFFFFFF); // Colors.white @ 4% - subtle fills
+  static const Color mutedTextColor = Colors.white60; // secondary/subtitle text
+  static const Color faintTextColor = Colors.white38; // timestamps, hints, footer text
+  static const Color successColor = Color(0xFF4ADE80);
+  static const Color errorColor = Colors.redAccent;
+  static const Color accentGold = Color(0xFFFFD700);
+
   // Gradients
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [primaryColor, secondaryColor],

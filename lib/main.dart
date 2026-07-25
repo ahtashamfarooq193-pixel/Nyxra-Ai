@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:my_chatgpt/splashscreen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'utils/constants.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,8 +29,12 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: const Color(0xFF0A0E27), // Use dark background
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppConstants.primaryColor,
+          brightness: Brightness.dark,
+          surface: AppConstants.surfaceColor,
+        ),
+        scaffoldBackgroundColor: AppConstants.backgroundColor,
         useMaterial3: true,
       ),
       home: const Splashscreen(),

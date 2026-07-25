@@ -49,7 +49,7 @@ class MessageBubble extends StatelessWidget {
               decoration: BoxDecoration(
                 color: message.isUser
                     ? AppConstants.primaryColor.withOpacity(0.12)
-                    : Colors.white.withOpacity(0.04),
+                    : AppConstants.surfaceOverlay,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(18),
                   topRight: const Radius.circular(18),
@@ -59,7 +59,7 @@ class MessageBubble extends StatelessWidget {
                 border: Border.all(
                   color: message.isUser
                       ? AppConstants.primaryColor.withOpacity(0.25)
-                      : Colors.white.withOpacity(0.08),
+                      : AppConstants.borderColor,
                   width: 1,
                 ),
               ),
@@ -153,7 +153,7 @@ class MessageBubble extends StatelessWidget {
                       ? 'Sending...'
                       : _formatTime(message.timestamp),
                   style:
-                      GoogleFonts.inter(fontSize: 10, color: Colors.white38),
+                      GoogleFonts.inter(fontSize: 10, color: AppConstants.faintTextColor),
                 ),
                 const SizedBox(width: 8),
                 if (!isSending) ...[
@@ -262,14 +262,14 @@ class MessageBubble extends StatelessWidget {
           );
         }
       } else {
-        // Mobile: Save to gallery
-        await Clipboard.setData(ClipboardData(text: 'Image saved!'));
+        // Mobile: no gallery-save integration yet — guide the user instead of
+        // showing a false "saved" confirmation.
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('✅ Long press the image to save it!',
+              content: Text('Long-press the image to save it to your gallery.',
                   style: GoogleFonts.inter()),
-              backgroundColor: Colors.green.shade800,
+              backgroundColor: AppConstants.surfaceColor,
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -290,12 +290,12 @@ class MessageBubble extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         child: Icon(
           icon,
           size: 14,
           color: isDelete
-              ? Colors.redAccent.withOpacity(0.5)
+              ? AppConstants.errorColor.withOpacity(0.5)
               : Colors.white24,
         ),
       ),
@@ -451,7 +451,7 @@ class _CopyableCodeBuilder extends MarkdownElementBuilder {
             child: Container(
               constraints: const BoxConstraints(minHeight: 44),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E2746), // Slightly lighter than background
+                color: AppConstants.aiMessageColor,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppConstants.primaryColor.withOpacity(0.3)),
                 boxShadow: [

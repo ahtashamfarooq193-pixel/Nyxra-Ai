@@ -21,11 +21,14 @@ class TokenStoreScreen extends StatelessWidget {
       builder: (context) => AlertDialog(
         backgroundColor: AppConstants.surfaceColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Confirm Purchase', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Text('Do you want to buy $title ($tokens tokens)?', style: GoogleFonts.inter(color: Colors.white70)),
+        title: Text('Add Tokens (Demo)', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text(
+          'Add $tokens tokens to your account? Payments aren\'t live yet, so this won\'t charge you anything.',
+          style: GoogleFonts.inter(color: AppConstants.mutedTextColor),
+        ),
         actions: [
           TextButton(
-            child: Text('Cancel', style: GoogleFonts.inter(color: Colors.white60)),
+            child: Text('Cancel', style: GoogleFonts.inter(color: AppConstants.mutedTextColor)),
             onPressed: () => Navigator.pop(context, false),
           ),
           ElevatedButton(
@@ -33,7 +36,7 @@ class TokenStoreScreen extends StatelessWidget {
               backgroundColor: AppConstants.primaryColor,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: Text('Buy Now', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text('Add Tokens', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
             onPressed: () => Navigator.pop(context, true),
           ),
         ],
@@ -54,7 +57,7 @@ class TokenStoreScreen extends StatelessWidget {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Successfully added $tokens tokens to your account!', style: GoogleFonts.inter()),
+            content: Text('✅ Added $tokens tokens to your account!', style: GoogleFonts.inter()),
             backgroundColor: Colors.green.shade800,
             behavior: SnackBarBehavior.floating,
           ),
@@ -100,7 +103,9 @@ class TokenStoreScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(),
-                const SizedBox(height: 30),
+                const SizedBox(height: 12),
+                _buildDemoModeNotice(),
+                const SizedBox(height: 24),
                 _buildUnlimitedCard(context), // Added context
                 const SizedBox(height: 30),
                 Text(
@@ -118,6 +123,29 @@ class TokenStoreScreen extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDemoModeNotice() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppConstants.surfaceOverlay,
+        borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+        border: Border.all(color: AppConstants.borderColor),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline_rounded, size: 16, color: AppConstants.mutedTextColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Demo mode — tokens are added for free while payments aren\'t live yet.',
+              style: GoogleFonts.inter(fontSize: 12, color: AppConstants.mutedTextColor),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -305,10 +333,10 @@ class TokenStoreScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF1E1E1E),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.4), width: 1.5),
+          border: Border.all(color: AppConstants.accentGold.withOpacity(0.4), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFFD700).withOpacity(0.08),
+              color: AppConstants.accentGold.withOpacity(0.08),
               blurRadius: 25,
               offset: const Offset(0, 8),
             ),
@@ -322,7 +350,7 @@ class TokenStoreScreen extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: const BoxDecoration(
-                  color: Color(0xFFFFD700),
+                  color: AppConstants.accentGold,
                   borderRadius: BorderRadius.only(
                     topRight: Radius.circular(22),
                     bottomLeft: Radius.circular(16),
@@ -349,7 +377,7 @@ class TokenStoreScreen extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFD700).withOpacity(0.1),
+                            color: AppConstants.accentGold.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -357,7 +385,7 @@ class TokenStoreScreen extends StatelessWidget {
                             style: GoogleFonts.inter(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
-                              color: const Color(0xFFFFD700),
+                              color: AppConstants.accentGold,
                             ),
                           ),
                         ),
@@ -388,7 +416,7 @@ class TokenStoreScreen extends StatelessWidget {
                         style: GoogleFonts.poppins(
                           fontSize: 32,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xFFFFD700),
+                          color: AppConstants.accentGold,
                         ),
                       ),
                       Text(

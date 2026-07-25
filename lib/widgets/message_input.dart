@@ -118,7 +118,7 @@ class _MessageInputState extends State<MessageInput> {
         decoration: BoxDecoration(
           color: AppConstants.surfaceColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: AppConstants.borderColor),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -138,7 +138,7 @@ class _MessageInputState extends State<MessageInput> {
                 _buildMenuOption(
                   icon: Icons.image_rounded,
                   label: 'Gallery',
-                  color: Colors.blueAccent,
+                  color: AppConstants.primaryColor,
                   onTap: () {
                     Navigator.pop(context);
                     _pickImage(ImageSource.gallery);
@@ -147,7 +147,7 @@ class _MessageInputState extends State<MessageInput> {
                 _buildMenuOption(
                   icon: Icons.camera_alt_rounded,
                   label: 'Camera',
-                  color: Colors.greenAccent,
+                  color: AppConstants.successColor,
                   onTap: () {
                     Navigator.pop(context);
                     _pickImage(ImageSource.camera);
@@ -156,7 +156,7 @@ class _MessageInputState extends State<MessageInput> {
                 _buildMenuOption(
                   icon: Icons.auto_awesome_rounded,
                   label: 'AI Image',
-                  color: Colors.purpleAccent,
+                  color: AppConstants.secondaryColor,
                   onTap: () {
                     Navigator.pop(context);
                     _showAIImageDialog();
@@ -215,7 +215,7 @@ class _MessageInputState extends State<MessageInput> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.auto_awesome_rounded, color: Colors.purpleAccent),
+            const Icon(Icons.auto_awesome_rounded, color: AppConstants.secondaryColor),
             const SizedBox(width: 10),
             Text('AI Image Generator', style: GoogleFonts.poppins(color: Colors.white, fontSize: 18)),
           ],
@@ -226,7 +226,7 @@ class _MessageInputState extends State<MessageInput> {
           children: [
             Text(
               'Describe what you want to create:',
-              style: GoogleFonts.inter(color: Colors.white70, fontSize: 14),
+              style: GoogleFonts.inter(color: AppConstants.mutedTextColor, fontSize: 14),
             ),
             const SizedBox(height: 15),
             TextField(
@@ -237,7 +237,7 @@ class _MessageInputState extends State<MessageInput> {
                 hintText: 'e.g. A futuristic city at sunset',
                 hintStyle: GoogleFonts.inter(color: Colors.white24),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: AppConstants.surfaceOverlay,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -249,12 +249,12 @@ class _MessageInputState extends State<MessageInput> {
         ),
         actions: [
           TextButton(
-            child: Text('Cancel', style: GoogleFonts.inter(color: Colors.white60)),
+            child: Text('Cancel', style: GoogleFonts.inter(color: AppConstants.mutedTextColor)),
             onPressed: () => Navigator.pop(context),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.purpleAccent,
+              backgroundColor: AppConstants.secondaryColor,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: Text('Generate', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -353,7 +353,7 @@ class _MessageInputState extends State<MessageInput> {
         color: AppConstants.surfaceColor.withOpacity(0.98),
         border: Border(
           top: BorderSide(
-            color: Colors.white.withOpacity(0.05),
+            color: AppConstants.borderColor,
             width: 0.5,
           ),
         ),
@@ -367,7 +367,7 @@ class _MessageInputState extends State<MessageInput> {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
+                  color: AppConstants.surfaceOverlay,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Stack(
@@ -412,9 +412,9 @@ class _MessageInputState extends State<MessageInput> {
                 Container(
                   margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.06),
+                    color: AppConstants.surfaceOverlay,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    border: Border.all(color: AppConstants.borderColor),
                   ),
                   child: IconButton(
                     visualDensity: VisualDensity.compact,
@@ -429,12 +429,12 @@ class _MessageInputState extends State<MessageInput> {
                 Flexible(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.04),
+                      color: AppConstants.surfaceOverlay,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: _isListening 
+                        color: _isListening
                           ? AppConstants.primaryColor.withOpacity(0.5)
-                          : Colors.white.withOpacity(0.06),
+                          : AppConstants.borderColor,
                         width: 1,
                       ),
                     ),
@@ -488,7 +488,7 @@ class _MessageInputState extends State<MessageInput> {
                         border: Border.all(
                           color: _isListening 
                             ? AppConstants.primaryColor 
-                            : Colors.white.withOpacity(0.1),
+                            : AppConstants.borderColor,
                           width: 1.5,
                         ),
                       ),
@@ -516,7 +516,7 @@ class _MessageInputState extends State<MessageInput> {
                         border: Border.all(
                           color: (_isTyping || _pickedXFile != null)
                               ? AppConstants.primaryColor
-                              : Colors.white.withOpacity(0.1),
+                              : AppConstants.borderColor,
                           width: 1.5,
                         ),
                         boxShadow: (_isTyping || _pickedXFile != null) ? [

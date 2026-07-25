@@ -1,11 +1,11 @@
 {
-    "name": "my_chatgpt",
-    "short_name": "my_chatgpt",
+    "name": "Nyxra AI",
+    "short_name": "Nyxra AI",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0A0E27",
+    "theme_color": "#00D4FF",
+    "description": "Nyxra AI - Your advanced AI assistant.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
