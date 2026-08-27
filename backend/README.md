@@ -43,6 +43,16 @@ Provider calls have timeouts, invalid retired model values are migrated to
 supported defaults, and the next configured provider is tried automatically.
 At least one provider API key must be configured in the deployment environment.
 
+## Built-in features
+
+- Image generation: `/draw a cinematic city at night`
+- Public website audit: `/audit https://example.com`
+- Word document creation: `/docx a project proposal for a mobile app`
+
+Natural-language requests such as “create an image...” and “make a DOCX...” are
+also recognized. Website audits only fetch public HTTP/HTTPS pages; local and
+private network addresses are blocked.
+
 Response body:
 
 ```json

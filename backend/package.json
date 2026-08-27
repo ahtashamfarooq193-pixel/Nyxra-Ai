@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "docx": "^9.5.1",
     "dotenv": "^16.6.1",
     "express": "^4.21.2"
   },

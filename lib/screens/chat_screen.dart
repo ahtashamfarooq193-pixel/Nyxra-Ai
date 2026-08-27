@@ -360,11 +360,15 @@ class _ChatScreenState extends State<ChatScreen> {
     
     // Check if it's an image request to show a better loading state
     final lowerText = trimmedText.toLowerCase();
-    final isImageRequest = lowerText.startsWith('/') || 
-                          lowerText.startsWith('draw') || 
-                          lowerText.startsWith('generate') ||
-                          lowerText.startsWith('imagine') ||
-                          lowerText.startsWith('banao');
+    final isImageRequest = lowerText.startsWith('/draw ') ||
+                          lowerText.startsWith('/image ') ||
+                          lowerText.startsWith('/imagine ') ||
+                          lowerText.startsWith('draw ') ||
+                          lowerText.startsWith('generate image ') ||
+                          lowerText.startsWith('create image ') ||
+                          lowerText.startsWith('make image ') ||
+                          lowerText.startsWith('imagine ') ||
+                          lowerText.startsWith('tasveer banao');
 
     Message aiMessage = Message(
       id: aiMessageId,
@@ -399,7 +403,8 @@ class _ChatScreenState extends State<ChatScreen> {
         }
 
         // If it's an image response, clear the "Drawing..." placeholder first
-        if (chunk.startsWith("|||IMG|||") && aiMessage.text.contains('Drawing')) {
+        if ((chunk.startsWith("|||IMG|||") || chunk.startsWith("|||IMGURL|||")) &&
+            aiMessage.text.contains('Drawing')) {
            aiMessage = aiMessage.copyWith(text: '');
         }
 
@@ -414,6 +419,38 @@ class _ChatScreenState extends State<ChatScreen> {
               _messages[index] = aiMessage;
             }
           });
+          continue;
+        }
+
+        if (chunk.startsWith("|||IMGURL|||")) {
+          final imageUrl = chunk.substring(12);
+          setState(() {
+            final index = _messages.indexWhere((m) => m.id == aiMessageId);
+            if (index != -1) {
+              aiMessage = aiMessage.copyWith(imagePath: imageUrl);
+              _messages[index] = aiMessage;
+            }
+          });
+          continue;
+        }
+
+        if (chunk.startsWith("|||DOCX|||")) {
+          final documentPayload = chunk.substring(10);
+          final separatorIndex = documentPayload.indexOf('|||');
+          if (separatorIndex != -1) {
+            final documentName = documentPayload.substring(0, separatorIndex);
+            final documentBase64 = documentPayload.substring(separatorIndex + 3);
+            setState(() {
+              final index = _messages.indexWhere((m) => m.id == aiMessageId);
+              if (index != -1) {
+                aiMessage = aiMessage.copyWith(
+                  documentName: documentName,
+                  documentBase64: documentBase64,
+                );
+                _messages[index] = aiMessage;
+              }
+            });
+          }
           continue;
         }
 

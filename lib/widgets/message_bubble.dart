@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +7,8 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/message.dart';
 import '../utils/constants.dart';
 import 'package:flutter/gestures.dart';
+import 'package:universal_html/html.dart' as html;
+import 'package:url_launcher/url_launcher.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -99,15 +100,14 @@ class MessageBubble extends StatelessWidget {
 
                   // ─── AI Generated Image (from Pollinations/Flux) ───
                   if (!message.isUser &&
-                      message.imagePath != null &&
-                      message.imagePath!.startsWith('data:image'))
+                      message.imagePath != null)
                     GestureDetector(
                       onLongPress: () => _showActions(context, canEdit),
-                      child: _buildGeneratedImage(
-                          context,
-                          message.imagePath!.substring(
-                              message.imagePath!.indexOf(',') + 1)),
+                      child: _buildGeneratedImage(context, message.imagePath!),
                     ),
+
+                  if (!message.isUser && message.documentBase64 != null)
+                    _buildDocumentAttachment(context),
 
                   // ─── Text / Markdown - WITH SELECTION & LONG PRESS MENU ───
                   MarkdownBody(
@@ -168,14 +168,15 @@ class MessageBubble extends StatelessWidget {
                         Icons.edit_rounded, () => onEdit?.call(message)),
                   // Download button for AI generated images
                   if (!message.isUser &&
-                      message.imagePath != null &&
-                      message.imagePath!.startsWith('data:image'))
+                      message.imagePath != null)
                     _buildActionButton(
                         Icons.download_rounded,
-                        () => _downloadImage(
-                            context,
-                            message.imagePath!.substring(
-                                message.imagePath!.indexOf(',') + 1))),
+                        () => _downloadImage(context, message.imagePath!)),
+                  if (!message.isUser && message.documentBase64 != null)
+                    _buildActionButton(
+                      Icons.file_download_rounded,
+                      () => _downloadDocument(context),
+                    ),
                   _buildActionButton(Icons.delete_outline_rounded,
                       () => onDelete?.call(message),
                       isDelete: true),
@@ -190,36 +191,38 @@ class MessageBubble extends StatelessWidget {
   }
 
   /// Builds a proper square/portrait AI generated image with download button
-  Widget _buildGeneratedImage(BuildContext context, String base64Data) {
-    Uint8List? imageBytes;
-    try {
-      // Remove data:image/... prefix if present
-      final cleanBase64 =
-          base64Data.contains(',') ? base64Data.split(',')[1] : base64Data;
-      imageBytes = base64Decode(cleanBase64);
-    } catch (_) {
-      return const Icon(Icons.broken_image, color: Colors.white24, size: 48);
-    }
-
+  Widget _buildGeneratedImage(BuildContext context, String imagePath) {
+    final isDataImage = imagePath.startsWith('data:image');
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Stack(
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: Image.memory(
-              imageBytes,
-              // ✅ Fixed: proper square aspect ratio, not stretched
-              width: double.infinity,
-              fit: BoxFit.contain,
-            ),
+            child: isDataImage
+                ? Image.memory(
+                    base64Decode(imagePath.substring(imagePath.indexOf(',') + 1)),
+                    width: double.infinity,
+                    fit: BoxFit.contain,
+                  )
+                : Image.network(
+                    imagePath,
+                    width: double.infinity,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const SizedBox(
+                      height: 180,
+                      child: Center(
+                        child: Icon(Icons.broken_image, color: Colors.white24, size: 48),
+                      ),
+                    ),
+                  ),
           ),
           // Download button overlay
           Positioned(
             bottom: 8,
             right: 8,
             child: GestureDetector(
-              onTap: () => _downloadImage(context, base64Data),
+              onTap: () => _downloadImage(context, imagePath),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
@@ -246,43 +249,85 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  Future<void> _downloadImage(BuildContext context, String base64Data) async {
+  Widget _buildDocumentAttachment(BuildContext context) {
+    final fileName = message.documentName ?? 'nyxra-document.docx';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: () => _downloadDocument(context),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppConstants.primaryColor.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppConstants.primaryColor.withOpacity(0.25)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.description_rounded,
+                  color: AppConstants.primaryColor, size: 32),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(fileName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                            color: Colors.white, fontWeight: FontWeight.w600)),
+                    Text('Word document • Tap to download',
+                        style: GoogleFonts.inter(
+                            color: AppConstants.mutedTextColor, fontSize: 12)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.download_rounded, color: AppConstants.primaryColor),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _downloadImage(BuildContext context, String imagePath) async {
     try {
       if (kIsWeb) {
-        // Web: Use anchor download trick
-        final cleanBase64 =
-            base64Data.contains(',') ? base64Data.split(',')[1] : base64Data;
-        final dataUrl = 'data:image/png;base64,$cleanBase64';
-        // Copy the data URL to clipboard since universal_html is not used
-        await Clipboard.setData(ClipboardData(text: dataUrl));
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✅ Image URL copied! Paste in browser to save.',
-                  style: GoogleFonts.inter()),
-              backgroundColor: Colors.green.shade800,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+        html.AnchorElement(href: imagePath)
+          ..download = 'nyxra-image-${DateTime.now().millisecondsSinceEpoch}.png'
+          ..target = '_blank'
+          ..click();
       } else {
-        // Mobile: no gallery-save integration yet — guide the user instead of
-        // showing a false "saved" confirmation.
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Long-press the image to save it to your gallery.',
-                  style: GoogleFonts.inter()),
-              backgroundColor: AppConstants.surfaceColor,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+        await launchUrl(Uri.parse(imagePath), mode: LaunchMode.externalApplication);
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _downloadDocument(BuildContext context) async {
+    try {
+      final data = message.documentBase64;
+      if (data == null) return;
+      final fileName = message.documentName ?? 'nyxra-document.docx';
+      final dataUrl =
+          'data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,$data';
+      if (kIsWeb) {
+        html.AnchorElement(href: dataUrl)
+          ..download = fileName
+          ..click();
+      } else {
+        await launchUrl(Uri.parse(dataUrl), mode: LaunchMode.externalApplication);
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not download document: $error')),
         );
       }
     }
@@ -327,18 +372,24 @@ class MessageBubble extends StatelessWidget {
               },
             ),
             if (!message.isUser &&
-                message.imagePath != null &&
-                message.imagePath!.startsWith('data:image'))
+                message.imagePath != null)
               ListTile(
                 leading: const Icon(Icons.download_rounded, color: Colors.white),
                 title: const Text('Save Image',
                     style: TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(context);
-                  _downloadImage(
-                      context,
-                      message.imagePath!.substring(
-                          message.imagePath!.indexOf(',') + 1));
+                  _downloadImage(context, message.imagePath!);
+                },
+              ),
+            if (!message.isUser && message.documentBase64 != null)
+              ListTile(
+                leading: const Icon(Icons.file_download_rounded, color: Colors.white),
+                title: const Text('Download Word Document',
+                    style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _downloadDocument(context);
                 },
               ),
             if (canEdit)
@@ -390,8 +441,7 @@ class MessageBubble extends StatelessWidget {
           onTap: () => onCopy?.call(message),
         ),
         if (!message.isUser &&
-            message.imagePath != null &&
-            message.imagePath!.startsWith('data:image'))
+            message.imagePath != null)
           PopupMenuItem(
             child: Row(
               children: [
@@ -400,10 +450,18 @@ class MessageBubble extends StatelessWidget {
                 const Text('Save Image', style: TextStyle(color: Colors.white)),
               ],
             ),
-            onTap: () => _downloadImage(
-                context,
-                message.imagePath!.substring(
-                    message.imagePath!.indexOf(',') + 1)),
+            onTap: () => _downloadImage(context, message.imagePath!),
+          ),
+        if (!message.isUser && message.documentBase64 != null)
+          PopupMenuItem(
+            onTap: () => _downloadDocument(context),
+            child: const Row(
+              children: [
+                Icon(Icons.file_download_rounded, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Download Word Document', style: TextStyle(color: Colors.white)),
+              ],
+            ),
           ),
         if (canEdit)
           PopupMenuItem(

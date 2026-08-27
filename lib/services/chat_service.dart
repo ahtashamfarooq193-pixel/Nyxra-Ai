@@ -50,11 +50,27 @@ class ChatService {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       final text = decoded['text']?.toString().trim() ?? '';
       final generatedImage = decoded['generatedImage'] as String?;
+      final generatedImageUrl = decoded['generatedImageUrl'] as String?;
+      final generatedDocument = decoded['generatedDocument'] as String?;
+      final documentName = decoded['documentName']?.toString() ?? 'nyxra-document.docx';
 
       if (generatedImage != null) {
         // Special marker for images to be caught by the UI
         if (text.isNotEmpty) yield text;
         yield "|||IMG|||$generatedImage";
+        return;
+      }
+
+      if (generatedImageUrl != null && generatedImageUrl.isNotEmpty) {
+        if (text.isNotEmpty) yield text;
+        yield "|||IMGURL|||$generatedImageUrl";
+        return;
+      }
+
+      if (generatedDocument != null && generatedDocument.isNotEmpty) {
+        if (text.isNotEmpty) yield text;
+        final safeName = documentName.replaceAll('|||', '-');
+        yield "|||DOCX|||$safeName|||$generatedDocument";
         return;
       }
 

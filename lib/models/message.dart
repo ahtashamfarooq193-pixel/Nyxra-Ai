@@ -11,6 +11,8 @@ class Message {
   final DateTime timestamp;
   final MessageStatus status;
   final String? imagePath;
+  final String? documentBase64;
+  final String? documentName;
   final String sessionId; // Added to group messages
 
   Message({
@@ -20,6 +22,8 @@ class Message {
     required this.timestamp,
     this.status = MessageStatus.delivered,
     this.imagePath,
+    this.documentBase64,
+    this.documentName,
     required this.sessionId,
   });
 
@@ -34,6 +38,8 @@ class Message {
         orElse: () => MessageStatus.delivered,
       ),
       imagePath: json['imagePath'] as String?,
+      documentBase64: json['documentBase64'] as String?,
+      documentName: json['documentName'] as String?,
       sessionId: json['sessionId'] as String? ?? 'default', // Fallback for old messages
     );
   }
@@ -46,6 +52,8 @@ class Message {
       'timestamp': timestamp.toIso8601String(),
       'status': status.toString().split('.').last,
       'imagePath': imagePath,
+      'documentBase64': documentBase64,
+      'documentName': documentName,
       'sessionId': sessionId,
     };
   }
@@ -57,6 +65,8 @@ class Message {
     DateTime? timestamp,
     MessageStatus? status,
     String? imagePath,
+    String? documentBase64,
+    String? documentName,
     String? sessionId,
   }) {
     return Message(
@@ -66,6 +76,8 @@ class Message {
       timestamp: timestamp ?? this.timestamp,
       status: status ?? this.status,
       imagePath: imagePath ?? this.imagePath,
+      documentBase64: documentBase64 ?? this.documentBase64,
+      documentName: documentName ?? this.documentName,
       sessionId: sessionId ?? this.sessionId,
     );
   }
