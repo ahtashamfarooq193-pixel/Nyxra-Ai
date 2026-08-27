@@ -144,14 +144,18 @@ function logProviderFailure(provider, error) {
 
 function parseFeatureRequest(message) {
   const text = message.trim();
+  const normalizeImagePrompt = (prompt) => prompt
+    .replace(/\balion\b/gi, "a lion")
+    .trim();
   const imageMatch = text.match(/^\s*\/(?:draw|image|imagine)\s+([\s\S]+)/i) ||
-    text.match(/^\s*(?:draw|generate|create|make|banao|bana do|bna do)\s+(?:an?\s+)?(?:image|picture|photo|tasveer)\s*(?:of|ki|ka|:)?\s*([\s\S]+)/i) ||
-    text.match(/^\s*(?:mujhe\s+)?(?:ek\s+)?(?:image|picture|photo|tasveer)\s+(?:banao|bana do|bna do|generate|create)\s*(?:of|ki|ka|:)?\s*([\s\S]+)/i);
+    text.match(/^\s*(?:draw|generate|create|make|banao|bana do|bna do)\s+(?:an?\s+)?(?:image|img|pic(?:ture)?|photo|tasveer)\s*(?:of|ki|ka|:)?\s*([\s\S]+)/i) ||
+    text.match(/^\s*(?:mujhe\s+)?(?:ek\s+)?(?:image|img|pic(?:ture)?|photo|tasveer)\s+(?:banao|bana do|bna do|generate|create)\s*(?:of|ki|ka|:)?\s*([\s\S]+)/i) ||
+    text.match(/^\s*(?:draw|generate|create|make|banao|bana do|bna do)\s+(?:an?\s+)?(.+?)\s+(?:image|img|pics?|picture|photo|tasveer)\s*[.!?]*$/i);
   if (imageMatch?.[1]?.trim()) {
-    return { type: "image", prompt: imageMatch[1].trim() };
+    return { type: "image", prompt: normalizeImagePrompt(imageMatch[1]) };
   }
 
-  const mentionsImage = /\b(?:image|img|picture|photo|tasveer)\b/i.test(text);
+  const mentionsImage = /\b(?:image|img|pics?|picture|photo|tasveer)\b/i.test(text);
   const asksToCreate = /\b(?:draw|generate|create|make|bna|bnao|bana|banao)\b/i.test(text);
   if (mentionsImage && asksToCreate) {
     const romanUrduSubject = text.match(
@@ -159,7 +163,7 @@ function parseFeatureRequest(message) {
     )?.[1]?.trim();
     return {
       type: "image",
-      prompt: romanUrduSubject || text,
+      prompt: normalizeImagePrompt(romanUrduSubject || text),
     };
   }
 
