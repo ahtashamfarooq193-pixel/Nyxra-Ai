@@ -151,8 +151,25 @@ function parseFeatureRequest(message) {
     return { type: "image", prompt: imageMatch[1].trim() };
   }
 
+  const mentionsImage = /\b(?:image|img|picture|photo|tasveer)\b/i.test(text);
+  const asksToCreate = /\b(?:draw|generate|create|make|bna|bnao|bana|banao)\b/i.test(text);
+  if (mentionsImage && asksToCreate) {
+    const romanUrduSubject = text.match(
+      /\b(?:bna|bnao|bana|banao)\b\s*(?:k(?:ar)?\s*)?(?:do|du|de)?\s+(.+?)(?:\s+ki)?$/i,
+    )?.[1]?.trim();
+    return {
+      type: "image",
+      prompt: romanUrduSubject || text,
+    };
+  }
+
   const urlMatch = text.match(/https?:\/\/[^\s<>()]+/i);
-  if (urlMatch && (/^\s*\/audit\b/i.test(text) || /\b(?:audit|analy[sz]e|check|review)\b/i.test(text))) {
+  const textWithoutUrl = urlMatch ? text.replace(urlMatch[0], "").replace(/[^a-z0-9]/gi, "") : "";
+  if (urlMatch && (
+    /^\s*\/audit\b/i.test(text) ||
+    /\b(?:audit|analy[sz]e|check|review|inspect|dekho|dekh|website)\b/i.test(text) ||
+    textWithoutUrl.length <= 20
+  )) {
     return { type: "audit", url: urlMatch[0].replace(/[.,;!?]+$/, "") };
   }
 
