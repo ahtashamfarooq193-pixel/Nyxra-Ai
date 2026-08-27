@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#0A0E27",
     "theme_color": "#00D4FF",
-    "description": "Nyxra AI - Your advanced AI assistant.",
+    "description": "Chat, generate images, create DOCX files, and audit websites with Nyxra AI.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

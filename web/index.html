@@ -18,7 +18,24 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Nyxra AI - Your advanced AI assistant.">
+  <meta name="description" content="Chat with Nyxra AI to get helpful answers, generate images, create DOCX files, and audit websites from one fast AI assistant.">
+  <meta name="keywords" content="Nyxra, Nyxra AI, AI assistant, AI chat, AI image generator, website audit, DOCX generator">
+  <meta name="author" content="Ahtasham Farooq">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <link rel="canonical" href="https://nyxra-ai-shamii.web.app/">
+
+  <!-- Social previews -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Nyxra AI">
+  <meta property="og:title" content="Nyxra AI - Chat, Create Images & Audit Websites">
+  <meta property="og:description" content="Use Nyxra AI for helpful conversations, AI image generation, DOCX creation, and website audits.">
+  <meta property="og:url" content="https://nyxra-ai-shamii.web.app/">
+  <meta property="og:image" content="https://nyxra-ai-shamii.web.app/icons/Icon-512.png">
+  <meta property="og:image:alt" content="Nyxra AI logo">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Nyxra AI - Your All-in-One AI Assistant">
+  <meta name="twitter:description" content="Chat, generate images, create DOCX files, and audit websites with Nyxra AI.">
+  <meta name="twitter:image" content="https://nyxra-ai-shamii.web.app/icons/Icon-512.png">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -29,10 +46,69 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>Nyxra AI</title>
+  <title>Nyxra AI - Chat, Image Generator & Website Audit</title>
   <link rel="manifest" href="manifest.json">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Nyxra AI",
+    "alternateName": "Nyxra",
+    "url": "https://nyxra-ai-shamii.web.app/",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "Any",
+    "description": "An AI assistant for chat, image generation, DOCX creation, and website audits.",
+    "image": "https://nyxra-ai-shamii.web.app/icons/Icon-512.png",
+    "creator": {
+      "@type": "Person",
+      "name": "Ahtasham Farooq"
+    }
+  }
+  </script>
+
+  <!-- Match the app's dark theme immediately so the page never flashes
+       white while the Flutter engine loads and paints its first frame. -->
+  <style>
+    html, body {
+      background-color: #0A0E27;
+      height: 100%;
+      margin: 0;
+    }
+
+    .seo-shell {
+      box-sizing: border-box;
+      color: #f5f7ff;
+      font-family: Arial, sans-serif;
+      margin: 0 auto;
+      max-width: 760px;
+      padding: 64px 24px;
+      text-align: center;
+    }
+
+    .seo-shell h1 { font-size: 2rem; margin-bottom: 12px; }
+    .seo-shell p { color: #c5cae9; line-height: 1.6; }
+    .seo-shell ul { list-style: none; padding: 0; }
+    .seo-shell li { display: inline-block; margin: 6px 10px; }
+  </style>
 </head>
 <body>
+  <main id="seo-content" class="seo-shell">
+    <h1>Nyxra AI</h1>
+    <p>Your fast, all-in-one AI assistant for useful answers and creative work.</p>
+    <ul aria-label="Nyxra AI features">
+      <li>AI chat</li>
+      <li>Image generation</li>
+      <li>Website audits</li>
+      <li>DOCX creation</li>
+    </ul>
+  </main>
+  <noscript>Nyxra AI requires JavaScript to run. Enable JavaScript to use the AI assistant.</noscript>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      document.getElementById('seo-content')?.remove();
+    });
+  </script>
   <script src="flutter_bootstrap.js?v=1.0.1" async></script>
 </body>
 </html>
