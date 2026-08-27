@@ -292,6 +292,17 @@ class _MessageInputState extends State<MessageInput> {
         _isTyping = false;
         _pickedXFile = null;
       });
+
+      // Enter/send buttons can temporarily take focus from the TextField on
+      // web and desktop. Restore it after the frame so typing can continue
+      // immediately without clicking the input again.
+      if (!isVoiceInput) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _focusNode.requestFocus();
+          }
+        });
+      }
     }
   }
 
