@@ -37,24 +37,35 @@ class _MessageInputState extends State<MessageInput> {
     super.initState();
     _focusNode = widget.focusNode ?? FocusNode();
     
-    // Add listener to controller for ultimate Enter-to-send detection
-    _controller.addListener(_onControllerChanged);
-    
     _initSpeech();
   }
 
-  void _onControllerChanged() {
-    final text = _controller.text;
-    if (text.endsWith('\n')) {
-      final bool isShiftPressed = HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftLeft) || 
-                                  HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftRight);
-      
-      if (!isShiftPressed && (kIsWeb || (Theme.of(context).platform != TargetPlatform.android && Theme.of(context).platform != TargetPlatform.iOS))) {
-        // Remove the newline and send
-        _controller.text = text.substring(0, text.length - 1);
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    final isDesktop = kIsWeb ||
+        (Theme.of(context).platform != TargetPlatform.android &&
+            Theme.of(context).platform != TargetPlatform.iOS);
+    final isEnter = event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter;
+    if (!isDesktop || !isEnter) return KeyEventResult.ignored;
+
+    if (event is KeyDownEvent) {
+      final isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
+      if (isShiftPressed) {
+        final value = _controller.value;
+        final selection = value.selection;
+        final start = selection.isValid ? selection.start : value.text.length;
+        final end = selection.isValid ? selection.end : value.text.length;
+        final updatedText = value.text.replaceRange(start, end, '\n');
+        _controller.value = value.copyWith(
+          text: updatedText,
+          selection: TextSelection.collapsed(offset: start + 1),
+          composing: TextRange.empty,
+        );
+      } else {
         _handleSend();
       }
     }
+    return KeyEventResult.handled;
   }
 
   void _initSpeech() async {
@@ -68,7 +79,6 @@ class _MessageInputState extends State<MessageInput> {
 
   @override
   void dispose() {
-    _controller.removeListener(_onControllerChanged);
     _controller.dispose();
     if (widget.focusNode == null) {
       _focusNode.dispose();
@@ -449,18 +459,20 @@ class _MessageInputState extends State<MessageInput> {
                         width: 1,
                       ),
                     ),
-                      child: TextField(
-                        controller: _controller,
-                        focusNode: _focusNode,
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                        maxLines: null,
-                        minLines: 1,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _handleSend(),
-                        decoration: InputDecoration(
+                      child: Focus(
+                        onKeyEvent: _handleKeyEvent,
+                        child: TextField(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                          maxLines: null,
+                          minLines: 1,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _handleSend(),
+                          decoration: InputDecoration(
                           hintText: _isListening ? 'Listening...' : 'Type a message...',
                           hintStyle: GoogleFonts.inter(
                             color: _isListening 
@@ -475,11 +487,12 @@ class _MessageInputState extends State<MessageInput> {
                             vertical: 12,
                           ),
                         ),
-                        onChanged: (value) {
-                          setState(() {
-                            _isTyping = value.trim().isNotEmpty;
-                          });
-                        },
+                          onChanged: (value) {
+                            setState(() {
+                              _isTyping = value.trim().isNotEmpty;
+                            });
+                          },
+                        ),
                       ),
                   ),
                 ),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +10,7 @@ import '../utils/constants.dart';
 import 'package:flutter/gestures.dart';
 import 'package:universal_html/html.dart' as html;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -294,10 +296,28 @@ class MessageBubble extends StatelessWidget {
   Future<void> _downloadImage(BuildContext context, String imagePath) async {
     try {
       if (kIsWeb) {
-        html.AnchorElement(href: imagePath)
+        late Uint8List bytes;
+        var mimeType = 'image/png';
+        if (imagePath.startsWith('data:image')) {
+          final commaIndex = imagePath.indexOf(',');
+          mimeType = imagePath.substring(5, imagePath.indexOf(';'));
+          bytes = base64Decode(imagePath.substring(commaIndex + 1));
+        } else {
+          final response = await http.get(Uri.parse(imagePath));
+          if (response.statusCode != 200) {
+            throw Exception('Image server returned ${response.statusCode}');
+          }
+          bytes = response.bodyBytes;
+          mimeType = response.headers['content-type']?.split(';').first ?? mimeType;
+        }
+        final blob = html.Blob([bytes], mimeType);
+        final objectUrl = html.Url.createObjectUrlFromBlob(blob);
+        html.AnchorElement(href: objectUrl)
           ..download = 'nyxra-image-${DateTime.now().millisecondsSinceEpoch}.png'
-          ..target = '_blank'
           ..click();
+        Future<void>.delayed(const Duration(seconds: 1), () {
+          html.Url.revokeObjectUrl(objectUrl);
+        });
       } else {
         await launchUrl(Uri.parse(imagePath), mode: LaunchMode.externalApplication);
       }
@@ -315,13 +335,22 @@ class MessageBubble extends StatelessWidget {
       final data = message.documentBase64;
       if (data == null) return;
       final fileName = message.documentName ?? 'nyxra-document.docx';
-      final dataUrl =
-          'data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,$data';
       if (kIsWeb) {
-        html.AnchorElement(href: dataUrl)
+        final bytes = base64Decode(data);
+        final blob = html.Blob(
+          [bytes],
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        );
+        final objectUrl = html.Url.createObjectUrlFromBlob(blob);
+        html.AnchorElement(href: objectUrl)
           ..download = fileName
           ..click();
+        Future<void>.delayed(const Duration(seconds: 1), () {
+          html.Url.revokeObjectUrl(objectUrl);
+        });
       } else {
+        final dataUrl =
+            'data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,$data';
         await launchUrl(Uri.parse(dataUrl), mode: LaunchMode.externalApplication);
       }
     } catch (error) {
