@@ -35,7 +35,7 @@ class ChatService {
         'imageBase64': imageBytes == null ? null : base64Encode(imageBytes),
         'imagePath': imagePath,
       }),
-      ).timeout(const Duration(seconds: 60));
+      ).timeout(const Duration(seconds: 75));
 
       if (response.statusCode != 200) {
         String errorDetail = 'Something went wrong';

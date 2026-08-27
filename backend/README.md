@@ -30,6 +30,19 @@ Request body:
 }
 ```
 
+## AI provider fallback
+
+The chat route tries configured providers in this order:
+
+1. Gemini (text and images)
+2. Groq (text)
+3. Mistral (text and images)
+4. Cloudflare Workers AI (text)
+
+Provider calls have timeouts, invalid retired model values are migrated to
+supported defaults, and the next configured provider is tried automatically.
+At least one provider API key must be configured in the deployment environment.
+
 Response body:
 
 ```json
