@@ -42,13 +42,15 @@ app.get("/health", (req, res) => {
 app.post("/api/chat", async (req, res) => {
   try {
     const { userMessage, conversationHistory, imageBase64 } = req.body;
+    const history = Array.isArray(conversationHistory) ? conversationHistory : [];
     
     // --- TRY GEMINI FIRST ---
     const geminiKey = process.env.GEMINI_API_KEY;
     if (geminiKey) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
-        const contents = conversationHistory.slice(-10).map(msg => ({
+        const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`;
+        const contents = history.slice(-10).map(msg => ({
           role: msg.isUser ? "user" : "model",
           parts: [{ text: msg.text }]
         }));
@@ -60,7 +62,10 @@ app.post("/api/chat", async (req, res) => {
 
         const response = await fetch(url, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": geminiKey,
+          },
           body: JSON.stringify({ contents, systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] } })
         });
 
@@ -69,6 +74,8 @@ app.post("/api/chat", async (req, res) => {
           const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
           if (aiText) return res.json({ text: aiText });
         }
+        const errorText = await response.text();
+        console.error(`Gemini failed (${response.status}):`, errorText.slice(0, 500));
       } catch (geminiError) {
         console.error("Gemini failed, trying Groq...", geminiError.message);
       }
@@ -80,7 +87,7 @@ app.post("/api/chat", async (req, res) => {
       const groqUrl = "https://api.groq.com/openai/v1/chat/completions";
       const messages = [
         { role: "system", content: SYSTEM_INSTRUCTION },
-        ...conversationHistory.slice(-10).map(msg => ({
+        ...history.slice(-10).map(msg => ({
           role: msg.isUser ? "user" : "assistant",
           content: msg.text
         })),
@@ -93,7 +100,7 @@ app.post("/api/chat", async (req, res) => {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
             body: JSON.stringify({
-              model: imageBase64 ? "llama-3.2-11b-vision-preview" : "llama-3.3-70b-versatile",
+              model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
               messages,
               max_tokens: 1024
             })
@@ -104,7 +111,10 @@ app.post("/api/chat", async (req, res) => {
             const aiText = data.choices?.[0]?.message?.content;
             if (aiText) return res.json({ text: aiText });
           }
+          const errorText = await response.text();
+          console.error(`Groq failed (${response.status}):`, errorText.slice(0, 500));
         } catch (e) {
+          console.error("Groq request failed:", e.message);
           continue;
         }
       }
