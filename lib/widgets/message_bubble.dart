@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/message.dart';
 import '../utils/constants.dart';
-import 'package:flutter/gestures.dart';
 import 'package:universal_html/html.dart' as html;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
@@ -31,14 +29,16 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isSending = message.status == MessageStatus.sending;
-    final bool canEdit = message.isUser &&
+    final bool canEdit =
+        message.isUser &&
         DateTime.now().difference(message.timestamp).inMinutes < 2;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Column(
-        crossAxisAlignment:
-            message.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: message.isUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           GestureDetector(
             // Only right-click (web) opens the actions menu here — long-press is
@@ -46,11 +46,13 @@ class MessageBubble extends StatelessWidget {
             // (drag handles + system Copy toolbar) instead of stealing the
             // gesture. Copy/Edit/Delete are still always reachable via the
             // action row below, and via long-press on attached images.
-            onSecondaryTapDown: kIsWeb ? (details) => _showActionsAtPosition(
-              context,
-              canEdit,
-              details.globalPosition
-            ) : null,
+            onSecondaryTapDown: kIsWeb
+                ? (details) => _showActionsAtPosition(
+                    context,
+                    canEdit,
+                    details.globalPosition,
+                  )
+                : null,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
@@ -83,7 +85,9 @@ class MessageBubble extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                           child: message.imagePath!.startsWith('data:image')
                               ? Image.memory(
-                                  base64Decode(message.imagePath!.split(',')[1]),
+                                  base64Decode(
+                                    message.imagePath!.split(',')[1],
+                                  ),
                                   height: 200,
                                   width: double.infinity,
                                   fit: BoxFit.contain,
@@ -93,18 +97,21 @@ class MessageBubble extends StatelessWidget {
                                   height: 200,
                                   fit: BoxFit.contain,
                                   errorBuilder: (context, error, stackTrace) =>
-                                      const Icon(Icons.broken_image,
-                                          color: Colors.white24),
+                                      const Icon(
+                                        Icons.broken_image,
+                                        color: Colors.white24,
+                                      ),
                                 ),
                         ),
                       ),
                     ),
 
                   // ─── AI Generated Image (from Pollinations/Flux) ───
-                  if (!message.isUser &&
-                      message.imagePath != null)
+                  if (!message.isUser && message.imagePath != null)
                     GestureDetector(
                       onLongPress: () => _showActions(context, canEdit),
+                      onTap: () =>
+                          _showImagePreview(context, message.imagePath!),
                       child: _buildGeneratedImage(context, message.imagePath!),
                     ),
 
@@ -114,7 +121,8 @@ class MessageBubble extends StatelessWidget {
                   // ─── Text / Markdown - WITH SELECTION & LONG PRESS MENU ───
                   MarkdownBody(
                     data: message.text,
-                    selectable: true, // ✅ Enable native text selection on long press!
+                    selectable:
+                        true, // ✅ Enable native text selection on long press!
                     styleSheet: MarkdownStyleSheet(
                       p: GoogleFonts.inter(
                         fontSize: 15,
@@ -130,14 +138,16 @@ class MessageBubble extends StatelessWidget {
                         color: const Color(0xFF0D1117),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                            color: Colors.white.withOpacity(0.1), width: 1),
+                          color: Colors.white.withOpacity(0.1),
+                          width: 1,
+                        ),
                       ),
                       codeblockPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                     ),
-                    builders: {
-                      'code': _CopyableCodeBuilder(),
-                    },
+                    builders: {'code': _CopyableCodeBuilder()},
                     onTapLink: (text, href, title) {
                       // Handle links if needed
                     },
@@ -158,30 +168,38 @@ class MessageBubble extends StatelessWidget {
                   (isSending && message.isUser)
                       ? 'Sending...'
                       : _formatTime(message.timestamp),
-                  style:
-                      GoogleFonts.inter(fontSize: 10, color: AppConstants.faintTextColor),
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    color: AppConstants.faintTextColor,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 if (!isSending) ...[
                   _buildActionButton(
-                      Icons.copy_rounded, () => onCopy?.call(message)),
+                    Icons.copy_rounded,
+                    () => onCopy?.call(message),
+                  ),
                   if (canEdit)
                     _buildActionButton(
-                        Icons.edit_rounded, () => onEdit?.call(message)),
+                      Icons.edit_rounded,
+                      () => onEdit?.call(message),
+                    ),
                   // Download button for AI generated images
-                  if (!message.isUser &&
-                      message.imagePath != null)
+                  if (!message.isUser && message.imagePath != null)
                     _buildActionButton(
-                        Icons.download_rounded,
-                        () => _downloadImage(context, message.imagePath!)),
+                      Icons.download_rounded,
+                      () => _downloadImage(context, message.imagePath!),
+                    ),
                   if (!message.isUser && message.documentBase64 != null)
                     _buildActionButton(
                       Icons.file_download_rounded,
                       () => _downloadDocument(context),
                     ),
-                  _buildActionButton(Icons.delete_outline_rounded,
-                      () => onDelete?.call(message),
-                      isDelete: true),
+                  _buildActionButton(
+                    Icons.delete_outline_rounded,
+                    () => onDelete?.call(message),
+                    isDelete: true,
+                  ),
                 ],
                 if (message.isUser) const SizedBox(width: 4),
               ],
@@ -203,20 +221,29 @@ class MessageBubble extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             child: isDataImage
                 ? Image.memory(
-                    base64Decode(imagePath.substring(imagePath.indexOf(',') + 1)),
-                    width: double.infinity,
-                    fit: BoxFit.contain,
+                    base64Decode(
+                      imagePath.substring(imagePath.indexOf(',') + 1),
+                    ),
+                    width: 420,
+                    height: 360,
+                    fit: BoxFit.cover,
                   )
                 : Image.network(
                     imagePath,
-                    width: double.infinity,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const SizedBox(
-                      height: 180,
-                      child: Center(
-                        child: Icon(Icons.broken_image, color: Colors.white24, size: 48),
-                      ),
-                    ),
+                    width: 420,
+                    height: 360,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox(
+                          height: 180,
+                          child: Center(
+                            child: Icon(
+                              Icons.broken_image,
+                              color: Colors.white24,
+                              size: 48,
+                            ),
+                          ),
+                        ),
                   ),
           ),
           // Download button overlay
@@ -226,7 +253,10 @@ class MessageBubble extends StatelessWidget {
             child: GestureDetector(
               onTap: () => _downloadImage(context, imagePath),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.65),
                   borderRadius: BorderRadius.circular(20),
@@ -235,12 +265,19 @@ class MessageBubble extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.download_rounded,
-                        color: Colors.white, size: 16),
+                    const Icon(
+                      Icons.download_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                     const SizedBox(width: 4),
-                    Text('Save',
-                        style: GoogleFonts.inter(
-                            fontSize: 12, color: Colors.white)),
+                    Text(
+                      'Save',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Colors.white,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -263,31 +300,116 @@ class MessageBubble extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppConstants.primaryColor.withOpacity(0.08),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppConstants.primaryColor.withOpacity(0.25)),
+            border: Border.all(
+              color: AppConstants.primaryColor.withOpacity(0.25),
+            ),
           ),
           child: Row(
             children: [
-              const Icon(Icons.description_rounded,
-                  color: AppConstants.primaryColor, size: 32),
+              const Icon(
+                Icons.description_rounded,
+                color: AppConstants.primaryColor,
+                size: 32,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(fileName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                            color: Colors.white, fontWeight: FontWeight.w600)),
-                    Text('Word document • Tap to download',
-                        style: GoogleFonts.inter(
-                            color: AppConstants.mutedTextColor, fontSize: 12)),
+                    Text(
+                      fileName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Word document • Tap to download',
+                      style: GoogleFonts.inter(
+                        color: AppConstants.mutedTextColor,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const Icon(Icons.download_rounded, color: AppConstants.primaryColor),
+              const Icon(
+                Icons.download_rounded,
+                color: AppConstants.primaryColor,
+              ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showImagePreview(BuildContext context, String imagePath) async {
+    final isDataImage = imagePath.startsWith('data:image');
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.all(20),
+        backgroundColor: Colors.black,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        child: Stack(
+          children: [
+            SizedBox(
+              width: MediaQuery.of(dialogContext).size.width * 0.9,
+              height: MediaQuery.of(dialogContext).size.height * 0.86,
+              child: InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 5,
+                child: Center(
+                  child: isDataImage
+                      ? Image.memory(
+                          base64Decode(
+                            imagePath.substring(imagePath.indexOf(',') + 1),
+                          ),
+                          fit: BoxFit.contain,
+                        )
+                      : Image.network(
+                          imagePath,
+                          fit: BoxFit.contain,
+                          loadingBuilder: (_, child, progress) =>
+                              progress == null
+                              ? child
+                              : const CircularProgressIndicator(
+                                  color: AppConstants.primaryColor,
+                                ),
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
+                                Icons.broken_image,
+                                color: Colors.white38,
+                                size: 64,
+                              ),
+                        ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 12,
+              right: 12,
+              child: IconButton.filled(
+                tooltip: 'Close',
+                style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                onPressed: () => Navigator.pop(dialogContext),
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+              ),
+            ),
+            Positioned(
+              right: 12,
+              bottom: 12,
+              child: FilledButton.icon(
+                onPressed: () => _downloadImage(context, imagePath),
+                icon: const Icon(Icons.download_rounded),
+                label: const Text('Download'),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -308,24 +430,29 @@ class MessageBubble extends StatelessWidget {
             throw Exception('Image server returned ${response.statusCode}');
           }
           bytes = response.bodyBytes;
-          mimeType = response.headers['content-type']?.split(';').first ?? mimeType;
+          mimeType =
+              response.headers['content-type']?.split(';').first ?? mimeType;
         }
         final blob = html.Blob([bytes], mimeType);
         final objectUrl = html.Url.createObjectUrlFromBlob(blob);
         html.AnchorElement(href: objectUrl)
-          ..download = 'nyxra-image-${DateTime.now().millisecondsSinceEpoch}.png'
+          ..download =
+              'nyxra-image-${DateTime.now().millisecondsSinceEpoch}.png'
           ..click();
         Future<void>.delayed(const Duration(seconds: 1), () {
           html.Url.revokeObjectUrl(objectUrl);
         });
       } else {
-        await launchUrl(Uri.parse(imagePath), mode: LaunchMode.externalApplication);
+        await launchUrl(
+          Uri.parse(imagePath),
+          mode: LaunchMode.externalApplication,
+        );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -351,7 +478,10 @@ class MessageBubble extends StatelessWidget {
       } else {
         final dataUrl =
             'data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,$data';
-        await launchUrl(Uri.parse(dataUrl), mode: LaunchMode.externalApplication);
+        await launchUrl(
+          Uri.parse(dataUrl),
+          mode: LaunchMode.externalApplication,
+        );
       }
     } catch (error) {
       if (context.mounted) {
@@ -362,8 +492,11 @@ class MessageBubble extends StatelessWidget {
     }
   }
 
-  Widget _buildActionButton(IconData icon, VoidCallback onTap,
-      {bool isDelete = false}) {
+  Widget _buildActionButton(
+    IconData icon,
+    VoidCallback onTap, {
+    bool isDelete = false,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -393,19 +526,25 @@ class MessageBubble extends StatelessWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.copy_rounded, color: Colors.white),
-              title: const Text('Copy Message',
-                  style: TextStyle(color: Colors.white)),
+              title: const Text(
+                'Copy Message',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 onCopy?.call(message);
               },
             ),
-            if (!message.isUser &&
-                message.imagePath != null)
+            if (!message.isUser && message.imagePath != null)
               ListTile(
-                leading: const Icon(Icons.download_rounded, color: Colors.white),
-                title: const Text('Save Image',
-                    style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.download_rounded,
+                  color: Colors.white,
+                ),
+                title: const Text(
+                  'Save Image',
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _downloadImage(context, message.imagePath!);
@@ -413,9 +552,14 @@ class MessageBubble extends StatelessWidget {
               ),
             if (!message.isUser && message.documentBase64 != null)
               ListTile(
-                leading: const Icon(Icons.file_download_rounded, color: Colors.white),
-                title: const Text('Download Word Document',
-                    style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.file_download_rounded,
+                  color: Colors.white,
+                ),
+                title: const Text(
+                  'Download Word Document',
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   _downloadDocument(context);
@@ -424,18 +568,24 @@ class MessageBubble extends StatelessWidget {
             if (canEdit)
               ListTile(
                 leading: const Icon(Icons.edit_rounded, color: Colors.white),
-                title: const Text('Edit Message',
-                    style: TextStyle(color: Colors.white)),
+                title: const Text(
+                  'Edit Message',
+                  style: TextStyle(color: Colors.white),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   onEdit?.call(message);
                 },
               ),
             ListTile(
-              leading:
-                  const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-              title: const Text('Delete Permanently',
-                  style: TextStyle(color: Colors.redAccent)),
+              leading: const Icon(
+                Icons.delete_outline_rounded,
+                color: Colors.redAccent,
+              ),
+              title: const Text(
+                'Delete Permanently',
+                style: TextStyle(color: Colors.redAccent),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 onDelete?.call(message);
@@ -447,9 +597,14 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  void _showActionsAtPosition(BuildContext context, bool canEdit, Offset position) {
-    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    
+  void _showActionsAtPosition(
+    BuildContext context,
+    bool canEdit,
+    Offset position,
+  ) {
+    final RenderBox overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -469,8 +624,7 @@ class MessageBubble extends StatelessWidget {
           ),
           onTap: () => onCopy?.call(message),
         ),
-        if (!message.isUser &&
-            message.imagePath != null)
+        if (!message.isUser && message.imagePath != null)
           PopupMenuItem(
             child: Row(
               children: [
@@ -488,7 +642,10 @@ class MessageBubble extends StatelessWidget {
               children: [
                 Icon(Icons.file_download_rounded, color: Colors.white),
                 SizedBox(width: 12),
-                Text('Download Word Document', style: TextStyle(color: Colors.white)),
+                Text(
+                  'Download Word Document',
+                  style: TextStyle(color: Colors.white),
+                ),
               ],
             ),
           ),
@@ -498,7 +655,10 @@ class MessageBubble extends StatelessWidget {
               children: [
                 const Icon(Icons.edit_rounded, color: Colors.white),
                 const SizedBox(width: 12),
-                const Text('Edit Message', style: TextStyle(color: Colors.white)),
+                const Text(
+                  'Edit Message',
+                  style: TextStyle(color: Colors.white),
+                ),
               ],
             ),
             onTap: () => onEdit?.call(message),
@@ -544,7 +704,9 @@ class _CopyableCodeBuilder extends MarkdownElementBuilder {
               decoration: BoxDecoration(
                 color: AppConstants.aiMessageColor,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppConstants.primaryColor.withOpacity(0.3)),
+                border: Border.all(
+                  color: AppConstants.primaryColor.withOpacity(0.3),
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: AppConstants.primaryColor.withOpacity(0.1),
@@ -558,7 +720,10 @@ class _CopyableCodeBuilder extends MarkdownElementBuilder {
                 children: [
                   Flexible(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                       child: SelectableText(
                         code,
                         style: GoogleFonts.firaCode(
@@ -576,8 +741,13 @@ class _CopyableCodeBuilder extends MarkdownElementBuilder {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('✅ Copied: $code',
-                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                              content: Text(
+                                '✅ Copied: $code',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                               backgroundColor: AppConstants.primaryColor,
                               behavior: SnackBarBehavior.floating,
                               width: 200,
@@ -587,13 +757,21 @@ class _CopyableCodeBuilder extends MarkdownElementBuilder {
                         }
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
                         decoration: BoxDecoration(
                           color: AppConstants.primaryColor.withOpacity(0.2),
-                          borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)),
+                          borderRadius: const BorderRadius.horizontal(
+                            right: Radius.circular(12),
+                          ),
                         ),
-                        child: const Icon(Icons.copy_all_rounded,
-                            size: 18, color: AppConstants.primaryColor),
+                        child: const Icon(
+                          Icons.copy_all_rounded,
+                          size: 18,
+                          color: AppConstants.primaryColor,
+                        ),
                       ),
                     ),
                   ),
