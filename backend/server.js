@@ -48,7 +48,11 @@ app.post("/api/chat", async (req, res) => {
     const geminiKey = process.env.GEMINI_API_KEY;
     if (geminiKey) {
       try {
-        const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+        const configuredGeminiModel = process.env.GEMINI_MODEL?.trim();
+        const geminiModel = !configuredGeminiModel ||
+          ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash"].includes(configuredGeminiModel)
+          ? "gemini-3.6-flash"
+          : configuredGeminiModel;
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`;
         const contents = history.slice(-10).map(msg => ({
           role: msg.isUser ? "user" : "model",
@@ -85,6 +89,11 @@ app.post("/api/chat", async (req, res) => {
     const groqKeys = (process.env.GROQ_API_KEYS || "").split(",").map(k => k.trim()).filter(Boolean);
     if (groqKeys.length > 0) {
       const groqUrl = "https://api.groq.com/openai/v1/chat/completions";
+      const configuredGroqModel = process.env.GROQ_MODEL?.trim();
+      const groqModel = !configuredGroqModel ||
+        ["llama-3.2-11b-vision-preview", "llama-3.3-70b-versatile"].includes(configuredGroqModel)
+        ? "openai/gpt-oss-120b"
+        : configuredGroqModel;
       const messages = [
         { role: "system", content: SYSTEM_INSTRUCTION },
         ...history.slice(-10).map(msg => ({
@@ -100,7 +109,7 @@ app.post("/api/chat", async (req, res) => {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
             body: JSON.stringify({
-              model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+              model: groqModel,
               messages,
               max_tokens: 1024
             })
