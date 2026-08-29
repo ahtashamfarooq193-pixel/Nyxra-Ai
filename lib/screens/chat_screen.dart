@@ -363,7 +363,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           TextButton(
             child: Text(
-              'Save',
+              'Save & resend',
               style: GoogleFonts.inter(
                 color: AppConstants.primaryColor,
                 fontWeight: FontWeight.bold,
@@ -372,7 +372,9 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: () {
               final newText = editController.text.trim();
               if (newText.isNotEmpty && newText != message.text) {
-                _editMessage(message.id, newText);
+                Navigator.pop(context);
+                _editAndResendMessage(message, newText);
+                return;
               }
               Navigator.pop(context);
             },
@@ -382,17 +384,43 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _editMessage(String id, String newText) {
-    setState(() {
-      final index = _messages.indexWhere((m) => m.id == id);
-      if (index != -1) {
-        final updatedMessage = _messages[index].copyWith(text: newText);
-        _messages[index] = updatedMessage;
-        _syncMessageToCloud(updatedMessage);
-      }
-    });
-    _saveMessages();
+  Future<void> _editAndResendMessage(
+    Message originalMessage,
+    String newText,
+  ) async {
+    if (_isGenerating) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Stop the current response before editing a message.'),
+        ),
+      );
+      return;
+    }
+
+    final messageIndex = _messages.indexWhere(
+      (message) => message.id == originalMessage.id,
+    );
+    if (messageIndex == -1) return;
+
+    // Editing creates a fresh conversation branch. Remove the original prompt
+    // and everything after it, then send the edited prompt through the normal
+    // generation flow so state, limits, history, and cloud sync stay consistent.
+    final supersededMessages = _messages.sublist(messageIndex).toList();
+    setState(() => _messages.removeRange(messageIndex, _messages.length));
+
+    await _saveMessages();
+    if (_currentUserUid != null) {
+      await Future.wait(
+        supersededMessages.map(
+          (message) =>
+              _firestoreService.deleteMessage(_currentUserUid!, message.id),
+        ),
+      );
+    }
     _refreshHistory();
+
+    await _handleSendMessage(newText, originalMessage.imagePath, null);
   }
 
   void _updateMessageStatus(String messageId, MessageStatus newStatus) {
