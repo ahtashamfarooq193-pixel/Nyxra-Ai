@@ -148,8 +148,17 @@ class MessageBubble extends StatelessWidget {
                       ),
                     ),
                     builders: {'code': _CopyableCodeBuilder()},
-                    onTapLink: (text, href, title) {
-                      // Handle links if needed
+                    onTapLink: (text, href, title) async {
+                      if (href == null) return;
+                      final uri = Uri.tryParse(href);
+                      if (uri == null ||
+                          !(uri.scheme == 'http' || uri.scheme == 'https')) {
+                        return;
+                      }
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
                     },
                   ),
                 ],
@@ -230,72 +239,72 @@ class MessageBubble extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: isDataImage
-                ? Image.memory(
-                    base64Decode(
-                      imagePath.substring(imagePath.indexOf(',') + 1),
-                    ),
-                    width: previewWidth,
-                    height: previewHeight,
-                    fit: BoxFit.cover,
-                  )
-                : Image.network(
-                    imagePath,
-                    width: previewWidth,
-                    height: previewHeight,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const SizedBox(
-                          height: 180,
-                          child: Center(
-                            child: Icon(
-                              Icons.broken_image,
-                              color: Colors.white24,
-                              size: 48,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: isDataImage
+                      ? Image.memory(
+                          base64Decode(
+                            imagePath.substring(imagePath.indexOf(',') + 1),
+                          ),
+                          width: previewWidth,
+                          height: previewHeight,
+                          fit: BoxFit.cover,
+                        )
+                      : Image.network(
+                          imagePath,
+                          width: previewWidth,
+                          height: previewHeight,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const SizedBox(
+                                height: 180,
+                                child: Center(
+                                  child: Icon(
+                                    Icons.broken_image,
+                                    color: Colors.white24,
+                                    size: 48,
+                                  ),
+                                ),
+                              ),
+                        ),
+                ),
+                // Download button overlay
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: () => _downloadImage(context, imagePath),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.65),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.download_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Save',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: Colors.white,
                             ),
                           ),
-                        ),
-                  ),
-          ),
-          // Download button overlay
-          Positioned(
-            bottom: 8,
-            right: 8,
-            child: GestureDetector(
-              onTap: () => _downloadImage(context, imagePath),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.65),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white24),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.download_rounded,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Save',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: Colors.white,
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          ),
               ],
             ),
           );

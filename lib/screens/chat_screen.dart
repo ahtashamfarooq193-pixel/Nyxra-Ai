@@ -32,6 +32,10 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   bool _isLoading = false;
+  bool _isGenerating = false;
+  bool _stopRequested = false;
+  bool _showScrollToBottom = false;
+  int _generationId = 0;
   String? _currentUserUid;
   late String _currentSessionId = DateTime.now().millisecondsSinceEpoch
       .toString(); // Current active session
@@ -49,6 +53,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       _currentUserUid = FirebaseAuth.instance.currentUser?.uid;
       _startNewChat();
+      _scrollController.addListener(_handleScrollPosition);
 
       // Auto-focus input
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -245,6 +250,9 @@ class _ChatScreenState extends State<ChatScreen> {
   void _startNewChat() {
     if (!mounted) return;
     setState(() {
+      _generationId++;
+      _stopRequested = true;
+      _isGenerating = false;
       _messages.clear();
       _isLoading = false; // Reset loading state!
       _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
@@ -398,15 +406,43 @@ class _ChatScreenState extends State<ChatScreen> {
     _saveMessages();
   }
 
-  void _scrollToBottom() {
+  void _handleScrollPosition() {
+    if (!_scrollController.hasClients) return;
+    final shouldShow =
+        _scrollController.position.maxScrollExtent -
+            _scrollController.position.pixels >
+        180;
+    if (shouldShow != _showScrollToBottom && mounted) {
+      setState(() => _showScrollToBottom = shouldShow);
+    }
+  }
+
+  bool get _isNearBottom {
+    if (!_scrollController.hasClients) return true;
+    return _scrollController.position.maxScrollExtent -
+            _scrollController.position.pixels <
+        180;
+  }
+
+  void _scrollToBottom({bool force = false}) {
+    if (!force && !_isNearBottom) return;
     Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
+      if (mounted && _scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: AppConstants.mediumAnimation,
           curve: Curves.easeOut,
         );
       }
+    });
+  }
+
+  void _stopGeneration() {
+    if (!_isGenerating) return;
+    setState(() {
+      _stopRequested = true;
+      _isGenerating = false;
+      _isLoading = false;
     });
   }
 
@@ -418,6 +454,10 @@ class _ChatScreenState extends State<ChatScreen> {
   ]) async {
     final trimmedText = text.trim();
     if (trimmedText.isEmpty && imagePath == null) return;
+    if (_isGenerating) return;
+
+    final requestGenerationId = ++_generationId;
+    _stopRequested = false;
 
     // 1. Token Check
     if (_userTokens <= 0) {
@@ -432,7 +472,8 @@ class _ChatScreenState extends State<ChatScreen> {
       imageSlotReserved = await _reserveImageSlot();
       if (!imageSlotReserved) {
         _addMessage(
-          text: '🖼️ Aaj ki ${AppConstants.dailyFreeImages} free images ki limit complete ho gayi hai. Kal dobara images generate kar sakte hain.',
+          text:
+              '🖼️ Aaj ki ${AppConstants.dailyFreeImages} free images ki limit complete ho gayi hai. Kal dobara images generate kar sakte hain.',
           isUser: false,
         );
         return;
@@ -453,10 +494,11 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _messages.add(userMessage);
       _isLoading = true;
+      _isGenerating = true;
     });
 
     _saveMessages();
-    _scrollToBottom();
+    _scrollToBottom(force: true);
     _syncMessageToCloud(userMessage);
 
     // Create a placeholder for AI message
@@ -484,6 +526,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       await for (final chunk in stream) {
         if (!mounted) break;
+        if (_stopRequested || requestGenerationId != _generationId) break;
         if (_currentSessionId != aiMessage.sessionId)
           break; // User switched chats
 
@@ -562,7 +605,11 @@ class _ChatScreenState extends State<ChatScreen> {
         _scrollToBottom();
       }
 
-      if (_currentSessionId == aiMessage.sessionId) {
+      final wasStopped = _stopRequested || requestGenerationId != _generationId;
+      if (wasStopped && !isFirstChunk) {
+        _updateMessageStatus(aiMessageId, MessageStatus.delivered);
+        _saveMessages();
+      } else if (!wasStopped && _currentSessionId == aiMessage.sessionId) {
         // Mark as delivered and save
         _updateMessageStatus(aiMessageId, MessageStatus.delivered);
         _saveMessages();
@@ -577,7 +624,9 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       print('ChatScreen Streaming Error: $e');
-      if (isFirstChunk && _currentSessionId == aiMessage.sessionId) {
+      if (isFirstChunk &&
+          requestGenerationId == _generationId &&
+          _currentSessionId == aiMessage.sessionId) {
         _addMessage(
           text:
               '❌ **Service Error:** AI is temporarily unreachable. Please try again in a moment.',
@@ -588,9 +637,12 @@ class _ChatScreenState extends State<ChatScreen> {
       if (imageSlotReserved && !imageDelivered) {
         await _releaseImageSlot();
       }
-      if (mounted && _currentSessionId == aiMessage.sessionId) {
+      if (mounted &&
+          requestGenerationId == _generationId &&
+          _currentSessionId == aiMessage.sessionId) {
         setState(() {
           _isLoading = false;
+          _isGenerating = false;
         });
       }
     }
@@ -747,43 +799,73 @@ class _ChatScreenState extends State<ChatScreen> {
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isWideScreen = screenWidth > 900;
 
-    Widget mainChat = Column(
-      children: [
-        Flexible(
-          child: _messages.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: AppConstants.paddingMedium,
-                  ),
-                  itemCount: _messages.length + (_isLoading ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == _messages.length && _isLoading) {
-                      return _buildTypingIndicator();
-                    }
-                    return MessageBubble(
-                      message: _messages[index],
-                      onCopy: (msg) {
-                        Clipboard.setData(ClipboardData(text: msg.text));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Message copied to clipboard'),
+    Widget mainChat = Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 960),
+        child: Column(
+          children: [
+            Flexible(
+              child: Stack(
+                children: [
+                  _messages.isEmpty
+                      ? _buildEmptyState()
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: AppConstants.paddingMedium,
                           ),
-                        );
-                      },
-                      onEdit: (msg) => _showEditDialog(msg),
-                      onDelete: (msg) => _deleteMessage(msg.id),
-                    );
-                  },
-                ),
+                          itemCount: _messages.length + (_isLoading ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == _messages.length && _isLoading) {
+                              return _buildTypingIndicator();
+                            }
+                            return MessageBubble(
+                              message: _messages[index],
+                              onCopy: (msg) {
+                                Clipboard.setData(
+                                  ClipboardData(text: msg.text),
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Message copied to clipboard',
+                                    ),
+                                  ),
+                                );
+                              },
+                              onEdit: (msg) => _showEditDialog(msg),
+                              onDelete: (msg) => _deleteMessage(msg.id),
+                            );
+                          },
+                        ),
+                  if (_showScrollToBottom)
+                    Positioned(
+                      right: 16,
+                      bottom: 14,
+                      child: Tooltip(
+                        message: 'Jump to latest message',
+                        child: FloatingActionButton.small(
+                          heroTag: 'scroll_to_latest',
+                          backgroundColor: AppConstants.surfaceOverlay,
+                          foregroundColor: Colors.white,
+                          onPressed: () => _scrollToBottom(force: true),
+                          child: const Icon(Icons.keyboard_arrow_down_rounded),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            MessageInput(
+              onSendMessage: (text, imagePath, imageBytes, isVoiceInput) =>
+                  _handleSendMessage(text, imagePath, imageBytes, isVoiceInput),
+              focusNode: _focusNode,
+              isGenerating: _isGenerating,
+              onStopGenerating: _stopGeneration,
+            ),
+          ],
         ),
-        MessageInput(
-          onSendMessage: (text, imagePath, imageBytes, isVoiceInput) =>
-              _handleSendMessage(text, imagePath, imageBytes, isVoiceInput),
-          focusNode: _focusNode,
-        ),
-      ],
+      ),
     );
 
     if (isWideScreen) {
@@ -1406,6 +1488,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _loadSession(String sessionId, List<Message> allMessages) {
     setState(() {
+      _generationId++;
+      _stopRequested = true;
+      _isGenerating = false;
+      _isLoading = false;
       _currentSessionId = sessionId;
       _messages.clear();
       _messages.addAll(allMessages.where((m) => m.sessionId == sessionId));

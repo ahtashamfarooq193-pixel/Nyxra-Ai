@@ -11,11 +11,15 @@ import 'dart:io' as io;
 class MessageInput extends StatefulWidget {
   final Function(String, String?, Uint8List?, bool) onSendMessage;
   final FocusNode? focusNode;
+  final bool isGenerating;
+  final VoidCallback? onStopGenerating;
 
   const MessageInput({
     super.key,
     required this.onSendMessage,
     this.focusNode,
+    this.isGenerating = false,
+    this.onStopGenerating,
   });
 
   @override
@@ -36,15 +40,17 @@ class _MessageInputState extends State<MessageInput> {
   void initState() {
     super.initState();
     _focusNode = widget.focusNode ?? FocusNode();
-    
+
     _initSpeech();
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    final isDesktop = kIsWeb ||
+    final isDesktop =
+        kIsWeb ||
         (Theme.of(context).platform != TargetPlatform.android &&
             Theme.of(context).platform != TargetPlatform.iOS);
-    final isEnter = event.logicalKey == LogicalKeyboardKey.enter ||
+    final isEnter =
+        event.logicalKey == LogicalKeyboardKey.enter ||
         event.logicalKey == LogicalKeyboardKey.numpadEnter;
     if (!isDesktop || !isEnter) return KeyEventResult.ignored;
 
@@ -225,9 +231,15 @@ class _MessageInputState extends State<MessageInput> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.auto_awesome_rounded, color: AppConstants.secondaryColor),
+            const Icon(
+              Icons.auto_awesome_rounded,
+              color: AppConstants.secondaryColor,
+            ),
             const SizedBox(width: 10),
-            Text('AI Image Generator', style: GoogleFonts.poppins(color: Colors.white, fontSize: 18)),
+            Text(
+              'AI Image Generator',
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 18),
+            ),
           ],
         ),
         content: Column(
@@ -236,7 +248,10 @@ class _MessageInputState extends State<MessageInput> {
           children: [
             Text(
               'Describe what you want to create:',
-              style: GoogleFonts.inter(color: AppConstants.mutedTextColor, fontSize: 14),
+              style: GoogleFonts.inter(
+                color: AppConstants.mutedTextColor,
+                fontSize: 14,
+              ),
             ),
             const SizedBox(height: 15),
             TextField(
@@ -259,15 +274,26 @@ class _MessageInputState extends State<MessageInput> {
         ),
         actions: [
           TextButton(
-            child: Text('Cancel', style: GoogleFonts.inter(color: AppConstants.mutedTextColor)),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.inter(color: AppConstants.mutedTextColor),
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppConstants.secondaryColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            child: Text('Generate', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Generate',
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             onPressed: () {
               final prompt = promptController.text.trim();
               if (prompt.isNotEmpty) {
@@ -289,6 +315,7 @@ class _MessageInputState extends State<MessageInput> {
   }
 
   Future<void> _handleSend({bool isVoiceInput = false}) async {
+    if (widget.isGenerating) return;
     final text = _controller.text.trim();
     if (text.isNotEmpty || _pickedXFile != null) {
       Uint8List? imageBytes;
@@ -339,7 +366,7 @@ class _MessageInputState extends State<MessageInput> {
         },
         onError: (error) => setState(() => _isListening = false),
       );
-      
+
       if (available) {
         setState(() => _isListening = true);
         _speech.listen(
@@ -363,20 +390,18 @@ class _MessageInputState extends State<MessageInput> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final bool isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: isLandscape ? 6 : 10, 
-        vertical: isLandscape ? 4 : 8
+        horizontal: isLandscape ? 6 : 10,
+        vertical: isLandscape ? 4 : 8,
       ),
       decoration: BoxDecoration(
         color: AppConstants.surfaceColor.withOpacity(0.98),
         border: Border(
-          top: BorderSide(
-            color: AppConstants.borderColor,
-            width: 0.5,
-          ),
+          top: BorderSide(color: AppConstants.borderColor, width: 0.5),
         ),
       ),
       child: SafeArea(
@@ -395,19 +420,19 @@ class _MessageInputState extends State<MessageInput> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: kIsWeb 
-                        ? Image.network(
-                            _pickedXFile!.path,
-                            height: 80,
-                            width: 80,
-                            fit: BoxFit.cover,
-                          )
-                        : Image.file(
-                            io.File(_pickedXFile!.path),
-                            height: 80,
-                            width: 80,
-                            fit: BoxFit.cover,
-                          ),
+                      child: kIsWeb
+                          ? Image.network(
+                              _pickedXFile!.path,
+                              height: 80,
+                              width: 80,
+                              fit: BoxFit.cover,
+                            )
+                          : Image.file(
+                              io.File(_pickedXFile!.path),
+                              height: 80,
+                              width: 80,
+                              fit: BoxFit.cover,
+                            ),
                     ),
                     Positioned(
                       top: 2,
@@ -420,7 +445,11 @@ class _MessageInputState extends State<MessageInput> {
                             color: Colors.black87,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.close, size: 12, color: Colors.white),
+                          child: const Icon(
+                            Icons.close,
+                            size: 12,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
@@ -444,7 +473,8 @@ class _MessageInputState extends State<MessageInput> {
                       color: Colors.white.withOpacity(0.8),
                       size: 26,
                     ),
-                    onPressed: _showAttachmentMenu,
+                    tooltip: 'Add attachment',
+                    onPressed: widget.isGenerating ? null : _showAttachmentMenu,
                   ),
                 ),
                 Flexible(
@@ -454,30 +484,32 @@ class _MessageInputState extends State<MessageInput> {
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
                         color: _isListening
-                          ? AppConstants.primaryColor.withOpacity(0.5)
-                          : AppConstants.borderColor,
+                            ? AppConstants.primaryColor.withOpacity(0.5)
+                            : AppConstants.borderColor,
                         width: 1,
                       ),
                     ),
-                      child: Focus(
-                        onKeyEvent: _handleKeyEvent,
-                        child: TextField(
-                          controller: _controller,
-                          focusNode: _focusNode,
-                          style: GoogleFonts.inter(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                          maxLines: null,
-                          minLines: 1,
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: (_) => _handleSend(),
-                          decoration: InputDecoration(
-                          hintText: _isListening ? 'Listening...' : 'Type a message...',
+                    child: Focus(
+                      onKeyEvent: _handleKeyEvent,
+                      child: TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                        maxLines: 6,
+                        minLines: 1,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _handleSend(),
+                        decoration: InputDecoration(
+                          hintText: _isListening
+                              ? 'Listening...'
+                              : 'Type a message...',
                           hintStyle: GoogleFonts.inter(
-                            color: _isListening 
-                              ? AppConstants.primaryColor.withOpacity(0.5)
-                              : Colors.white.withOpacity(0.25),
+                            color: _isListening
+                                ? AppConstants.primaryColor.withOpacity(0.5)
+                                : Colors.white.withOpacity(0.25),
                             fontSize: 14,
                           ),
                           border: InputBorder.none,
@@ -487,17 +519,42 @@ class _MessageInputState extends State<MessageInput> {
                             vertical: 12,
                           ),
                         ),
-                          onChanged: (value) {
-                            setState(() {
-                              _isTyping = value.trim().isNotEmpty;
-                            });
-                          },
-                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            _isTyping = value.trim().isNotEmpty;
+                          });
+                        },
                       ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                if (!_isTyping && _pickedXFile == null)
+                if (widget.isGenerating)
+                  Tooltip(
+                    message: 'Stop generating',
+                    child: InkWell(
+                      onTap: widget.onStopGenerating,
+                      borderRadius: BorderRadius.circular(21),
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.08),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppConstants.mutedTextColor,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.stop_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  )
+                else if (!_isTyping && _pickedXFile == null)
                   GestureDetector(
                     onTap: _listen,
                     child: AnimatedContainer(
@@ -505,23 +562,25 @@ class _MessageInputState extends State<MessageInput> {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: _isListening 
-                          ? AppConstants.primaryColor.withOpacity(0.1)
-                          : Colors.transparent,
+                        color: _isListening
+                            ? AppConstants.primaryColor.withOpacity(0.1)
+                            : Colors.transparent,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: _isListening 
-                            ? AppConstants.primaryColor 
-                            : AppConstants.borderColor,
+                          color: _isListening
+                              ? AppConstants.primaryColor
+                              : AppConstants.borderColor,
                           width: 1.5,
                         ),
                       ),
                       child: Center(
                         child: Icon(
-                          _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                          color: _isListening 
-                            ? AppConstants.primaryColor 
-                            : Colors.white.withOpacity(0.4),
+                          _isListening
+                              ? Icons.mic_rounded
+                              : Icons.mic_none_rounded,
+                          color: _isListening
+                              ? AppConstants.primaryColor
+                              : Colors.white.withOpacity(0.4),
                           size: 22,
                         ),
                       ),
@@ -543,13 +602,17 @@ class _MessageInputState extends State<MessageInput> {
                               : AppConstants.borderColor,
                           width: 1.5,
                         ),
-                        boxShadow: (_isTyping || _pickedXFile != null) ? [
-                          BoxShadow(
-                            color: AppConstants.primaryColor.withOpacity(0.15),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          )
-                        ] : [],
+                        boxShadow: (_isTyping || _pickedXFile != null)
+                            ? [
+                                BoxShadow(
+                                  color: AppConstants.primaryColor.withOpacity(
+                                    0.15,
+                                  ),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : [],
                       ),
                       child: Center(
                         child: Icon(
@@ -568,7 +631,5 @@ class _MessageInputState extends State<MessageInput> {
         ),
       ),
     );
-
   }
 }
-
