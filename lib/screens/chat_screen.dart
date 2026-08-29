@@ -16,7 +16,6 @@ import '../services/storage_service.dart';
 import '../services/firestore_service.dart';
 import '../utils/constants.dart';
 import '../splashscreen.dart';
-import 'token_store_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -516,9 +515,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _showPurchaseMessage() {
     _addMessage(
-      text: '🚫 Aapki aaj ki free limit (5000 tokens) khatam ho gayi!\n\n'
-          '💎 **Aur tokens chahiye?**\n'
-          'Menu se "Buy Tokens" khol kar apna package choose karein.\n\n'
+      text:
+          '🚫 Aapki aaj ki free limit (5000 tokens) khatam ho gayi!\n\n'
+          '💎 **Token purchases abhi available nahi hain.**\n'
+          'Buy Tokens feature coming soon hai.\n\n'
           '⏰ **Free tokens?**\n'
           'Kal midnight tak wait karo — 5000 free tokens automatic reset ho jayenge! 🔄',
       isUser: false,
@@ -1056,15 +1056,9 @@ class _ChatScreenState extends State<ChatScreen> {
           const SizedBox(height: 20),
           _buildDrawerOption(
             icon: Icons.add_shopping_cart_rounded,
-            label: 'Buy Tokens',
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const TokenStoreScreen()),
-              );
-            },
-            isSpecial: true,
+            label: 'Buy Tokens · Coming Soon',
+            onTap: null,
+            isDisabled: true,
           ),
           const SizedBox(height: 8),
           _buildDrawerOption(
@@ -1083,37 +1077,50 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildDrawerOption({
     required IconData icon,
     required String label,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
     bool isSpecial = false,
+    bool isDisabled = false,
   }) {
     return InkWell(
-      onTap: onTap,
+      onTap: isDisabled ? null : onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
-          gradient: isSpecial ? AppConstants.primaryGradient : null,
-          color: isSpecial ? null : AppConstants.surfaceOverlay,
+          gradient: isSpecial && !isDisabled
+              ? AppConstants.primaryGradient
+              : null,
+          color: isSpecial && !isDisabled ? null : AppConstants.surfaceOverlay,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSpecial ? Colors.white.withOpacity(0.2) : AppConstants.borderColor,
+            color: isSpecial && !isDisabled
+                ? Colors.white.withOpacity(0.2)
+                : AppConstants.borderColor,
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: Colors.white, size: 20),
+            Icon(
+              icon,
+              color: isDisabled ? AppConstants.mutedTextColor : Colors.white,
+              size: 20,
+            ),
             const SizedBox(width: 12),
             Text(
               label,
               style: GoogleFonts.inter(
                 fontSize: 14,
-                color: Colors.white,
+                color: isDisabled ? AppConstants.mutedTextColor : Colors.white,
                 fontWeight: isSpecial ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
-            if (isSpecial) ...[
+            if (isSpecial && !isDisabled) ...[
               const Spacer(),
-              const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Colors.white,
+                size: 12,
+              ),
             ],
           ],
         ),
