@@ -9,7 +9,7 @@ import '../utils/constants.dart';
 import 'dart:io' as io;
 
 class MessageInput extends StatefulWidget {
-  final Function(String, String?, Uint8List?, bool) onSendMessage;
+  final Future<bool> Function(String, String?, Uint8List?, bool) onSendMessage;
   final FocusNode? focusNode;
   final bool isGenerating;
   final VoidCallback? onStopGenerating;
@@ -32,6 +32,7 @@ class _MessageInputState extends State<MessageInput> {
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isTyping = false;
   bool _isListening = false;
+  bool _isSubmitting = false;
   XFile? _pickedXFile;
 
   late FocusNode _focusNode;
@@ -77,7 +78,7 @@ class _MessageInputState extends State<MessageInput> {
   void _initSpeech() async {
     try {
       await _speech.initialize();
-      setState(() {});
+      if (mounted) setState(() {});
     } catch (e) {
       print('Speech initialization error: $e');
     }
@@ -114,8 +115,13 @@ class _MessageInputState extends State<MessageInput> {
         }
       }
 
-      final XFile? image = await _picker.pickImage(source: source);
-      if (image != null) {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 2048,
+        maxHeight: 2048,
+      );
+      if (image != null && mounted) {
         setState(() {
           _pickedXFile = image;
         });
@@ -315,20 +321,41 @@ class _MessageInputState extends State<MessageInput> {
   }
 
   Future<void> _handleSend({bool isVoiceInput = false}) async {
-    if (widget.isGenerating) return;
+    if (widget.isGenerating || _isSubmitting) return;
     final text = _controller.text.trim();
     if (text.isNotEmpty || _pickedXFile != null) {
+      _isSubmitting = true;
       Uint8List? imageBytes;
-      if (_pickedXFile != null) {
-        imageBytes = await _pickedXFile!.readAsBytes();
-      }
+      try {
+        if (_pickedXFile != null) {
+          imageBytes = await _pickedXFile!.readAsBytes();
+          if (imageBytes.length > 5 * 1024 * 1024) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please choose an image smaller than 5 MB.'),
+                ),
+              );
+            }
+            return;
+          }
+        }
 
-      widget.onSendMessage(text, _pickedXFile?.path, imageBytes, isVoiceInput);
-      _controller.clear();
-      setState(() {
-        _isTyping = false;
-        _pickedXFile = null;
-      });
+        final accepted = await widget.onSendMessage(
+          text,
+          _pickedXFile?.path,
+          imageBytes,
+          isVoiceInput,
+        );
+        if (!accepted || !mounted) return;
+        _controller.clear();
+        setState(() {
+          _isTyping = false;
+          _pickedXFile = null;
+        });
+      } finally {
+        _isSubmitting = false;
+      }
 
       // Enter/send buttons can temporarily take focus from the TextField on
       // web and desktop. Restore it after the frame so typing can continue
@@ -360,11 +387,13 @@ class _MessageInputState extends State<MessageInput> {
 
       bool available = await _speech.initialize(
         onStatus: (status) {
-          if (status == 'done' || status == 'notListening') {
+          if (mounted && (status == 'done' || status == 'notListening')) {
             setState(() => _isListening = false);
           }
         },
-        onError: (error) => setState(() => _isListening = false),
+        onError: (error) {
+          if (mounted) setState(() => _isListening = false);
+        },
       );
 
       if (available) {

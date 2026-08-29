@@ -12,8 +12,66 @@ const {
 require("dotenv").config();
 
 const app = express();
-app.use(cors());
+const ALLOWED_ORIGINS = new Set(
+  (process.env.ALLOWED_ORIGINS ||
+    "https://nyxra-ai-shamii.web.app,https://nyxra-ai-shamii.firebaseapp.com")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
+app.disable("x-powered-by");
+app.use((req, res, next) => {
+  res.set({
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Cache-Control": "no-store",
+  });
+  next();
+});
+app.use(cors({
+  origin(origin, callback) {
+    // Native apps and same-origin/server requests do not send Origin.
+    if (!origin || ALLOWED_ORIGINS.has(origin) ||
+        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error("Origin not allowed by CORS"));
+  },
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"],
+  maxAge: 86400,
+}));
 app.use(express.json({ limit: "8mb" }));
+
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+const RATE_MAX_REQUESTS = 40;
+const rateBuckets = new Map();
+app.use("/api", (req, res, next) => {
+  const now = Date.now();
+  const forwardedFor = req.headers["x-forwarded-for"];
+  const clientKey = (typeof forwardedFor === "string"
+    ? forwardedFor.split(",")[0].trim()
+    : req.ip || req.socket.remoteAddress) || "unknown";
+  const current = rateBuckets.get(clientKey);
+  const bucket = !current || current.resetAt <= now
+    ? { count: 0, resetAt: now + RATE_WINDOW_MS }
+    : current;
+  bucket.count += 1;
+  rateBuckets.set(clientKey, bucket);
+  res.set("X-RateLimit-Limit", String(RATE_MAX_REQUESTS));
+  res.set("X-RateLimit-Remaining", String(Math.max(0, RATE_MAX_REQUESTS - bucket.count)));
+  if (bucket.count > RATE_MAX_REQUESTS) {
+    res.set("Retry-After", String(Math.ceil((bucket.resetAt - now) / 1000)));
+    return res.status(429).json({ error: "Too many requests. Please try again later." });
+  }
+  if (rateBuckets.size > 5000) {
+    for (const [key, value] of rateBuckets) {
+      if (value.resetAt <= now) rateBuckets.delete(key);
+    }
+  }
+  next();
+});
 
 const SYSTEM_INSTRUCTION = `You are Nyxra AI, a capable, thoughtful, and friendly general-purpose AI assistant created by Ahtasham.
 
@@ -62,7 +120,8 @@ function normalizeHistory(conversationHistory, userMessage) {
   return history;
 }
 
-const PROVIDER_TIMEOUT_MS = 25000;
+const PROVIDER_TIMEOUT_MS = 12000;
+const MAX_AUDIT_BYTES = 2_000_000;
 
 function parseKeys(value) {
   return (value || "").split(",").map((key) => key.trim()).filter(Boolean);
@@ -286,7 +345,26 @@ async function fetchPublicHtml(initialUrl) {
     if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
       throw new Error("The URL does not return an HTML webpage.");
     }
-    const html = (await response.text()).slice(0, 2_000_000);
+    const declaredLength = Number.parseInt(response.headers.get("content-length") || "0", 10);
+    if (declaredLength > MAX_AUDIT_BYTES) {
+      throw new Error("The webpage is too large to audit safely.");
+    }
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("The website returned an unreadable response.");
+    const decoder = new TextDecoder();
+    let html = "";
+    let receivedBytes = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      receivedBytes += value.byteLength;
+      if (receivedBytes > MAX_AUDIT_BYTES) {
+        await reader.cancel();
+        throw new Error("The webpage is too large to audit safely.");
+      }
+      html += decoder.decode(value, { stream: true });
+    }
+    html += decoder.decode();
     return { response, html, url: currentUrl, elapsedMs: Date.now() - startedAt };
   }
   throw new Error("Website redirected too many times.");
@@ -530,7 +608,7 @@ app.post("/api/chat", async (req, res) => {
     }
 
     // --- FALLBACK TO GROQ ---
-    const groqKeys = (process.env.GROQ_API_KEYS || "").split(",").map(k => k.trim()).filter(Boolean);
+    const groqKeys = parseKeys(process.env.GROQ_API_KEYS).slice(0, 2);
     if (!imageBase64 && groqKeys.length > 0) {
       const groqUrl = "https://api.groq.com/openai/v1/chat/completions";
       const configuredGroqModel = process.env.GROQ_MODEL?.trim();
@@ -575,7 +653,7 @@ app.post("/api/chat", async (req, res) => {
     }
 
     // --- FALLBACK TO MISTRAL (also supports image input) ---
-    const mistralKeys = parseKeys(process.env.MISTRAL_API_KEYS);
+    const mistralKeys = parseKeys(process.env.MISTRAL_API_KEYS).slice(0, 1);
     if (mistralKeys.length > 0) {
       const mistralModel = resolveModel(
         process.env.MISTRAL_MODEL,
@@ -669,6 +747,13 @@ app.post("/api/chat", async (req, res) => {
     console.error("Critical Error:", error);
     res.status(500).json({ error: "Internal Server Error", details: error.message });
   }
+});
+
+app.use((error, req, res, next) => {
+  if (error?.message === "Origin not allowed by CORS") {
+    return res.status(403).json({ error: "Origin not allowed." });
+  }
+  next(error);
 });
 
 // Vercel export

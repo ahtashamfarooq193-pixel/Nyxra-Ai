@@ -45,6 +45,7 @@ class _ChatScreenState extends State<ChatScreen> {
   int _dailyImagesUsed = 0;
   List<Message> _allHistoryMessages = [];
   bool _isHistoryLoading = false;
+  int _historyLoadId = 0;
   bool _isSigningIn = false;
 
   @override
@@ -72,18 +73,17 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _refreshHistory() async {
-    if (_isHistoryLoading) return;
+    final loadId = ++_historyLoadId;
     setState(() => _isHistoryLoading = true);
 
     List<Message> messages = [];
     if (_currentUserUid != null) {
       messages = await _firestoreService.loadMessages(_currentUserUid!);
-    }
-    if (messages.isEmpty) {
+    } else {
       messages = await _storageService.loadMessages();
     }
 
-    if (mounted) {
+    if (mounted && loadId == _historyLoadId) {
       setState(() {
         _allHistoryMessages = messages;
         _isHistoryLoading = false;
@@ -271,8 +271,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _saveMessages() async {
-    // Save locally
-    await _storageService.saveMessages(_messages);
+    if (_currentUserUid == null) {
+      await _storageService.saveSessionMessages(_messages);
+    }
   }
 
   Future<void> _syncMessageToCloud(Message message) async {
@@ -294,6 +295,8 @@ class _ChatScreenState extends State<ChatScreen> {
     required bool isUser,
     MessageStatus? status,
     String? imagePath,
+    bool isError = false,
+    bool persist = true,
   }) {
     final newMessage = Message(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -303,14 +306,17 @@ class _ChatScreenState extends State<ChatScreen> {
       status: status ?? MessageStatus.delivered,
       imagePath: imagePath,
       sessionId: _currentSessionId,
+      isError: isError,
     );
 
     setState(() {
       _messages.add(newMessage);
     });
 
-    _saveMessages();
-    _syncMessageToCloud(newMessage);
+    if (persist) {
+      _saveMessages();
+      _syncMessageToCloud(newMessage);
+    }
     _scrollToBottom();
     _refreshHistory();
   }
@@ -398,29 +404,13 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    final messageIndex = _messages.indexWhere(
-      (message) => message.id == originalMessage.id,
+    await _handleSendMessage(
+      newText,
+      originalMessage.imagePath,
+      null,
+      false,
+      originalMessage.id,
     );
-    if (messageIndex == -1) return;
-
-    // Editing creates a fresh conversation branch. Remove the original prompt
-    // and everything after it, then send the edited prompt through the normal
-    // generation flow so state, limits, history, and cloud sync stay consistent.
-    final supersededMessages = _messages.sublist(messageIndex).toList();
-    setState(() => _messages.removeRange(messageIndex, _messages.length));
-
-    await _saveMessages();
-    if (_currentUserUid != null) {
-      await Future.wait(
-        supersededMessages.map(
-          (message) =>
-              _firestoreService.deleteMessage(_currentUserUid!, message.id),
-        ),
-      );
-    }
-    _refreshHistory();
-
-    await _handleSendMessage(newText, originalMessage.imagePath, null);
   }
 
   void _updateMessageStatus(String messageId, MessageStatus newStatus) {
@@ -474,15 +464,16 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _handleSendMessage(
+  Future<bool> _handleSendMessage(
     String text,
     String? imagePath,
     Uint8List? imageBytes, [
     bool isVoiceInput = false,
+    String? editFromMessageId,
   ]) async {
     final trimmedText = text.trim();
-    if (trimmedText.isEmpty && imagePath == null) return;
-    if (_isGenerating) return;
+    if (trimmedText.isEmpty && imagePath == null) return false;
+    if (_isGenerating) return false;
 
     final requestGenerationId = ++_generationId;
     _stopRequested = false;
@@ -490,7 +481,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // 1. Token Check
     if (_userTokens <= 0) {
       _showPurchaseMessage();
-      return;
+      return false;
     }
 
     final isImageRequest = _isImageGenerationRequest(trimmedText);
@@ -503,8 +494,33 @@ class _ChatScreenState extends State<ChatScreen> {
           text:
               '🖼️ Aaj ki ${AppConstants.dailyFreeImages} free images ki limit complete ho gayi hai. Kal dobara images generate kar sakte hain.',
           isUser: false,
+          isError: true,
+          persist: false,
         );
-        return;
+        return false;
+      }
+    }
+
+    if (editFromMessageId != null) {
+      final messageIndex = _messages.indexWhere(
+        (message) => message.id == editFromMessageId,
+      );
+      if (messageIndex == -1) {
+        if (imageSlotReserved) await _releaseImageSlot();
+        return false;
+      }
+
+      // Only replace the old branch after all local validation and quota
+      // reservation succeeded, so a rejected edit never destroys history.
+      final supersededMessages = _messages.sublist(messageIndex).toList();
+      setState(() => _messages.removeRange(messageIndex, _messages.length));
+      if (_currentUserUid != null) {
+        await Future.wait(
+          supersededMessages.map(
+            (message) =>
+                _firestoreService.deleteMessage(_currentUserUid!, message.id),
+          ),
+        );
       }
     }
 
@@ -528,6 +544,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _saveMessages();
     _scrollToBottom(force: true);
     _syncMessageToCloud(userMessage);
+    _refreshHistory();
 
     // Create a placeholder for AI message
     final aiMessageId = (DateTime.now().millisecondsSinceEpoch + 1).toString();
@@ -547,7 +564,9 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final stream = _chatService.getAIResponseStream(
         trimmedText,
-        _messages.where((m) => m.id != aiMessageId).toList(),
+        _messages
+            .where((message) => message.id != aiMessageId && !message.isError)
+            .toList(),
         imagePath: imagePath,
         imageBytes: imageBytes,
       );
@@ -650,6 +669,19 @@ class _ChatScreenState extends State<ChatScreen> {
         // 2. Token Deduction
         _deductTokens(aiMessage.text);
       }
+    } on ChatServiceException catch (error) {
+      if (requestGenerationId == _generationId &&
+          _currentSessionId == aiMessage.sessionId) {
+        if (!isFirstChunk) {
+          setState(() => _messages.removeWhere((m) => m.id == aiMessageId));
+        }
+        _addMessage(
+          text: '❌ **Service Error:** ${error.message}',
+          isUser: false,
+          isError: true,
+          persist: false,
+        );
+      }
     } catch (e) {
       print('ChatScreen Streaming Error: $e');
       if (isFirstChunk &&
@@ -659,6 +691,8 @@ class _ChatScreenState extends State<ChatScreen> {
           text:
               '❌ **Service Error:** AI is temporarily unreachable. Please try again in a moment.',
           isUser: false,
+          isError: true,
+          persist: false,
         );
       }
     } finally {
@@ -674,6 +708,7 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     }
+    return true;
   }
 
   void _deductTokens(String response) {
@@ -707,6 +742,8 @@ class _ChatScreenState extends State<ChatScreen> {
           '⏰ **Free tokens?**\n'
           'Kal midnight tak wait karo — 5000 free tokens automatic reset ho jayenge! 🔄',
       isUser: false,
+      isError: true,
+      persist: false,
     );
   }
 
@@ -1575,16 +1612,19 @@ class _ChatScreenState extends State<ChatScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            onPressed: () {
-              setState(() {
-                _messages.clear();
-                _startNewChat();
-              });
-              _storageService.clearMessages();
-              if (_currentUserUid != null) {
-                _firestoreService.clearMessages(_currentUserUid!);
-              }
+            onPressed: () async {
               Navigator.pop(context);
+              _generationId++;
+              _stopRequested = true;
+              if (_currentUserUid == null) {
+                await _storageService.clearMessages();
+              }
+              if (_currentUserUid != null) {
+                await _firestoreService.clearMessages(_currentUserUid!);
+              }
+              if (!mounted) return;
+              _startNewChat();
+              await _refreshHistory();
             },
           ),
         ],
@@ -1645,11 +1685,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     // 3. Update UI
-    setState(() {
-      if (_currentSessionId == sessionId) {
-        _startNewChat();
-      }
-    });
+    if (!mounted) return;
+    if (_currentSessionId == sessionId) {
+      _startNewChat();
+    }
 
     _refreshHistory();
 

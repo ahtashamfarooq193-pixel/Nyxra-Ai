@@ -17,34 +17,38 @@ class ChatService {
     Uint8List? imageBytes,
   }) async* {
     try {
-      final response = await http.post(
-        Uri.parse('$_backendBaseUrl/api/chat'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-        'userMessage': userMessage,
-        'conversationHistory': conversationHistory
-            .map(
-              (message) => {
-                'text': message.text,
-                'isUser': message.isUser,
-              },
-            )
-            .toList(),
-        'imageBase64': imageBytes == null ? null : base64Encode(imageBytes),
-        'imagePath': imagePath,
-      }),
-      ).timeout(const Duration(seconds: 75));
+      final response = await http
+          .post(
+            Uri.parse('$_backendBaseUrl/api/chat'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'userMessage': userMessage,
+              'conversationHistory': conversationHistory
+                  .map(
+                    (message) => {
+                      'text': message.text,
+                      'isUser': message.isUser,
+                    },
+                  )
+                  .toList(),
+              'imageBase64': imageBytes == null
+                  ? null
+                  : base64Encode(imageBytes),
+              'imagePath': imagePath,
+            }),
+          )
+          .timeout(const Duration(seconds: 75));
 
       if (response.statusCode != 200) {
         String errorDetail = 'Something went wrong';
         try {
           final errDecoded = jsonDecode(response.body);
-          errorDetail = errDecoded['details'] ?? errDecoded['error'] ?? errorDetail;
+          errorDetail =
+              errDecoded['details'] ?? errDecoded['error'] ?? errorDetail;
         } catch (_) {}
-        yield '❌ **Server Error (${response.statusCode}):** $errorDetail';
-        return;
+        throw ChatServiceException(
+          'Server Error (${response.statusCode}): $errorDetail',
+        );
       }
 
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
@@ -52,7 +56,8 @@ class ChatService {
       final generatedImage = decoded['generatedImage'] as String?;
       final generatedImageUrl = decoded['generatedImageUrl'] as String?;
       final generatedDocument = decoded['generatedDocument'] as String?;
-      final documentName = decoded['documentName']?.toString() ?? 'nyxra-document.docx';
+      final documentName =
+          decoded['documentName']?.toString() ?? 'nyxra-document.docx';
 
       if (generatedImage != null) {
         // Special marker for images to be caught by the UI
@@ -75,8 +80,9 @@ class ChatService {
       }
 
       if (text.isEmpty) {
-        yield '❌ **Empty response:** AI service didn\'t return any text. Please try again.';
-        return;
+        throw const ChatServiceException(
+          'AI service returned an empty response. Please try again.',
+        );
       }
 
       for (final chunk in _chunkResponse(text)) {
@@ -84,10 +90,16 @@ class ChatService {
         await Future.delayed(const Duration(milliseconds: 18));
       }
     } on TimeoutException {
-      yield '❌ **Timeout Error:** The server is taking too long to respond. Please check your connection.';
+      throw const ChatServiceException(
+        'The server took too long to respond. Please try again.',
+      );
+    } on ChatServiceException {
+      rethrow;
     } catch (e) {
       print('ChatService Error: $e');
-      yield '❌ **Connection Error:** Failed to connect to AI service. Detail: ${e.toString().split('\n')[0]}';
+      throw const ChatServiceException(
+        'Could not connect to the AI service. Check your connection and retry.',
+      );
     }
   }
 
@@ -104,4 +116,13 @@ class ChatService {
 
     return chunks.isEmpty ? [text] : chunks;
   }
+}
+
+class ChatServiceException implements Exception {
+  final String message;
+
+  const ChatServiceException(this.message);
+
+  @override
+  String toString() => message;
 }

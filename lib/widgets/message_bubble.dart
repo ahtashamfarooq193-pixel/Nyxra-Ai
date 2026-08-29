@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' as io;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +10,8 @@ import '../utils/constants.dart';
 import 'package:universal_html/html.dart' as html;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -468,9 +471,30 @@ class MessageBubble extends StatelessWidget {
           html.Url.revokeObjectUrl(objectUrl);
         });
       } else {
-        await launchUrl(
-          Uri.parse(imagePath),
-          mode: LaunchMode.externalApplication,
+        late Uint8List bytes;
+        var mimeType = 'image/png';
+        if (imagePath.startsWith('data:image')) {
+          final commaIndex = imagePath.indexOf(',');
+          mimeType = imagePath.substring(5, imagePath.indexOf(';'));
+          bytes = base64Decode(imagePath.substring(commaIndex + 1));
+        } else {
+          final response = await http.get(Uri.parse(imagePath));
+          if (response.statusCode != 200) {
+            throw Exception('Image server returned ${response.statusCode}');
+          }
+          bytes = response.bodyBytes;
+          mimeType =
+              response.headers['content-type']?.split(';').first ?? mimeType;
+        }
+        final extension = mimeType.contains('jpeg')
+            ? 'jpg'
+            : mimeType.split('/').last;
+        if (!context.mounted) return;
+        await _shareMobileFile(
+          context,
+          bytes,
+          'nyxra-image-${DateTime.now().millisecondsSinceEpoch}.$extension',
+          mimeType,
         );
       }
     } catch (e) {
@@ -501,11 +525,11 @@ class MessageBubble extends StatelessWidget {
           html.Url.revokeObjectUrl(objectUrl);
         });
       } else {
-        final dataUrl =
-            'data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,$data';
-        await launchUrl(
-          Uri.parse(dataUrl),
-          mode: LaunchMode.externalApplication,
+        await _shareMobileFile(
+          context,
+          base64Decode(data),
+          fileName,
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         );
       }
     } catch (error) {
@@ -515,6 +539,31 @@ class MessageBubble extends StatelessWidget {
         );
       }
     }
+  }
+
+  Future<void> _shareMobileFile(
+    BuildContext context,
+    Uint8List bytes,
+    String fileName,
+    String mimeType,
+  ) async {
+    final directory = await getTemporaryDirectory();
+    final safeName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '-');
+    final file = io.File(
+      '${directory.path}${io.Platform.pathSeparator}$safeName',
+    );
+    await file.writeAsBytes(bytes, flush: true);
+    if (!context.mounted) return;
+    final box = context.findRenderObject() as RenderBox?;
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path, mimeType: mimeType, name: safeName)],
+        subject: safeName,
+        sharePositionOrigin: box == null
+            ? null
+            : box.localToGlobal(Offset.zero) & box.size,
+      ),
+    );
   }
 
   Widget _buildActionButton(

@@ -3,24 +3,37 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/message.dart';
 
 class StorageService {
-  static const String _messagesKey = 'chat_messages';
+  static const String _legacyMessagesKey = 'chat_messages';
+  static const String _guestMessagesKey = 'chat_messages_guest';
   static const String _guestTokensKey = 'guest_tokens';
   static const String _guestResetKey = 'guest_tokens_reset_day';
   static const String _guestImageCountKey = 'guest_image_count';
   static const String _guestImageResetKey = 'guest_image_reset_day';
 
-  Future<void> saveMessages(List<Message> messages) async {
+  Future<void> saveSessionMessages(List<Message> sessionMessages) async {
+    if (sessionMessages.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
+    final messages = await loadMessages();
+    final sessionIds = sessionMessages
+        .map((message) => message.sessionId)
+        .toSet();
+    messages.removeWhere((message) => sessionIds.contains(message.sessionId));
+    messages.addAll(sessionMessages);
+    messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     final String encodedData = jsonEncode(
       messages.map((m) => m.toJson()).toList(),
     );
-    await prefs.setString(_messagesKey, encodedData);
+    await prefs.setString(_guestMessagesKey, encodedData);
   }
 
   Future<List<Message>> loadMessages() async {
     final prefs = await SharedPreferences.getInstance();
-    final String? encodedData = prefs.getString(_messagesKey);
-    
+    String? encodedData = prefs.getString(_guestMessagesKey);
+
+    // One-time migration from the original shared key. Account chats are never
+    // written here, keeping signed-in and guest history isolated.
+    encodedData ??= prefs.getString(_legacyMessagesKey);
+
     if (encodedData == null) return [];
 
     try {
@@ -36,13 +49,18 @@ class StorageService {
 
   Future<void> clearMessages() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_messagesKey);
+    await prefs.remove(_guestMessagesKey);
+    await prefs.remove(_legacyMessagesKey);
   }
 
   Future<void> deleteSession(String sessionId) async {
     final messages = await loadMessages();
     messages.removeWhere((m) => m.sessionId == sessionId);
-    await saveMessages(messages);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _guestMessagesKey,
+      jsonEncode(messages.map((message) => message.toJson()).toList()),
+    );
   }
 
   /// Local token balance for guests (not signed in), mirroring the daily reset

@@ -1,8 +1,4 @@
-enum MessageStatus {
-  sending,
-  sent,
-  delivered,
-}
+enum MessageStatus { sending, sent, delivered }
 
 class Message {
   final String id;
@@ -14,6 +10,7 @@ class Message {
   final String? documentBase64;
   final String? documentName;
   final String sessionId; // Added to group messages
+  final bool isError;
 
   Message({
     required this.id,
@@ -25,6 +22,7 @@ class Message {
     this.documentBase64,
     this.documentName,
     required this.sessionId,
+    this.isError = false,
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
@@ -40,7 +38,10 @@ class Message {
       imagePath: json['imagePath'] as String?,
       documentBase64: json['documentBase64'] as String?,
       documentName: json['documentName'] as String?,
-      sessionId: json['sessionId'] as String? ?? 'default', // Fallback for old messages
+      sessionId:
+          json['sessionId'] as String? ??
+          'default', // Fallback for old messages
+      isError: json['isError'] as bool? ?? false,
     );
   }
 
@@ -55,6 +56,7 @@ class Message {
       'documentBase64': documentBase64,
       'documentName': documentName,
       'sessionId': sessionId,
+      'isError': isError,
     };
   }
 
@@ -68,6 +70,7 @@ class Message {
     String? documentBase64,
     String? documentName,
     String? sessionId,
+    bool? isError,
   }) {
     return Message(
       id: id ?? this.id,
@@ -79,7 +82,7 @@ class Message {
       documentBase64: documentBase64 ?? this.documentBase64,
       documentName: documentName ?? this.documentName,
       sessionId: sessionId ?? this.sessionId,
+      isError: isError ?? this.isError,
     );
   }
 }
-
