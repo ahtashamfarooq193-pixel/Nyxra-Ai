@@ -179,42 +179,49 @@ class _ChatScreenState extends State<ChatScreen> {
   void _initTts() async {
     try {
       await _flutterTts.setLanguage("en-US");
-      await _flutterTts.setSpeechRate(0.45); // Balanced speed
+      // Browser speech rates use a different scale from native engines.
+      await _flutterTts.setSpeechRate(kIsWeb ? 0.9 : 0.48);
       await _flutterTts.setVolume(1.0);
-      await _flutterTts.setPitch(1.0);
+      await _flutterTts.setPitch(1.02);
 
-      // Try to set the engine to Google TTS (Best for Android)
-      if (!kIsWeb && Theme.of(context).platform == TargetPlatform.android) {
-        await _flutterTts.setEngine("com.google.android.tts");
-      }
+      // Do not force Google's Android engine. Prefer Microsoft voices exposed
+      // by Windows/Edge/Chrome or an installed mobile speech engine, then fall
+      // back gracefully to the best available English female/natural voice.
+      final voices = await _flutterTts.getVoices;
+      if (voices is List) {
+        final voiceList = voices
+            .whereType<Map>()
+            .map((voice) => Map<String, dynamic>.from(voice))
+            .where((voice) {
+              final locale = voice['locale']?.toString().toLowerCase() ?? '';
+              return locale.startsWith('en');
+            })
+            .toList();
 
-      // Fetch available voices and try to find a "Premium/Enhanced" one
-      var voices = await _flutterTts.getVoices;
-      if (voices != null) {
-        List<dynamic> voiceList = List<dynamic>.from(voices);
+        int voiceScore(Map<String, dynamic> voice) {
+          final name = voice['name']?.toString().toLowerCase() ?? '';
+          final locale = voice['locale']?.toString().toLowerCase() ?? '';
+          var score = 0;
+          if (name.contains('microsoft')) score += 1000;
+          if (name.contains('aria')) score += 300;
+          if (name.contains('jenny')) score += 280;
+          if (name.contains('sonia')) score += 260;
+          if (name.contains('zira')) score += 240;
+          if (name.contains('natural') || name.contains('online')) score += 120;
+          if (name.contains('female')) score += 80;
+          if (locale == 'en-us') score += 40;
+          if (locale == 'en-gb') score += 30;
+          return score;
+        }
 
-        // Priority list for professional sounding voices
-        final priorityVoices = [
-          "en-us-x-sfg#female_1-local",
-          "en-us-x-tpf-local",
-          "en-us-x-iol-local",
-          "en-us-x-low-local",
-          "en-gb-x-fis-local",
-        ];
-
-        for (var priority in priorityVoices) {
-          final found = voiceList.firstWhere(
-            (v) => v["name"].toString().contains(priority),
-            orElse: () => null,
-          );
-          if (found != null) {
-            await _flutterTts.setVoice({
-              "name": found["name"],
-              "locale": found["locale"],
-            });
-            print("Selected Premium Voice: ${found["name"]}");
-            break;
-          }
+        voiceList.sort((a, b) => voiceScore(b).compareTo(voiceScore(a)));
+        if (voiceList.isNotEmpty && voiceScore(voiceList.first) > 0) {
+          final selectedVoice = voiceList.first;
+          await _flutterTts.setVoice({
+            'name': selectedVoice['name'].toString(),
+            'locale': selectedVoice['locale'].toString(),
+          });
+          debugPrint('TTS voice selected: ${selectedVoice['name']}');
         }
       }
     } catch (e) {
