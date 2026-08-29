@@ -215,8 +215,21 @@ class MessageBubble extends StatelessWidget {
     final isDataImage = imagePath.startsWith('data:image');
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Stack(
-        children: [
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final availableWidth = constraints.hasBoundedWidth
+              ? constraints.maxWidth
+              : 420.0;
+          final previewWidth = availableWidth > 420.0 ? 420.0 : availableWidth;
+          final previewHeight = (previewWidth * 0.78)
+              .clamp(140.0, 360.0)
+              .toDouble();
+          return SizedBox(
+            width: previewWidth,
+            height: previewHeight,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(14),
             child: isDataImage
@@ -224,14 +237,14 @@ class MessageBubble extends StatelessWidget {
                     base64Decode(
                       imagePath.substring(imagePath.indexOf(',') + 1),
                     ),
-                    width: 420,
-                    height: 360,
+                    width: previewWidth,
+                    height: previewHeight,
                     fit: BoxFit.cover,
                   )
                 : Image.network(
                     imagePath,
-                    width: 420,
-                    height: 360,
+                    width: previewWidth,
+                    height: previewHeight,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) =>
                         const SizedBox(
@@ -283,7 +296,10 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
           ),
-        ],
+              ],
+            ),
+          );
+        },
       ),
     );
   }

@@ -160,4 +160,72 @@ class FirestoreService {
       return 300;
     }
   }
+
+  Future<int> getDailyImageCount(String userId) async {
+    try {
+      final docRef = _firestore.collection('users').doc(userId);
+      return await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(docRef);
+        final data = snapshot.data() ?? <String, dynamic>{};
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final lastReset = data['imageGenerationReset'] as Timestamp?;
+        if (lastReset == null || lastReset.toDate().isBefore(today)) {
+          transaction.set(docRef, {
+            'imageGenerationsUsed': 0,
+            'imageGenerationReset': today,
+          }, SetOptions(merge: true));
+          return 0;
+        }
+        return (data['imageGenerationsUsed'] as num?)?.toInt() ?? 0;
+      });
+    } catch (e) {
+      print('Error loading daily image count: $e');
+      return 0;
+    }
+  }
+
+  Future<bool> tryReserveDailyImage(String userId, int dailyLimit) async {
+    try {
+      final docRef = _firestore.collection('users').doc(userId);
+      return await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(docRef);
+        final data = snapshot.data() ?? <String, dynamic>{};
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final lastReset = data['imageGenerationReset'] as Timestamp?;
+        final isNewDay = lastReset == null || lastReset.toDate().isBefore(today);
+        final used = isNewDay
+            ? 0
+            : (data['imageGenerationsUsed'] as num?)?.toInt() ?? 0;
+        if (used >= dailyLimit) return false;
+        transaction.set(docRef, {
+          'imageGenerationsUsed': used + 1,
+          'imageGenerationReset': today,
+        }, SetOptions(merge: true));
+        return true;
+      });
+    } catch (e) {
+      print('Error reserving image generation: $e');
+      return false;
+    }
+  }
+
+  Future<void> releaseDailyImage(String userId) async {
+    try {
+      final docRef = _firestore.collection('users').doc(userId);
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(docRef);
+        final data = snapshot.data() ?? <String, dynamic>{};
+        final used = (data['imageGenerationsUsed'] as num?)?.toInt() ?? 0;
+        if (used > 0) {
+          transaction.set(docRef, {
+            'imageGenerationsUsed': used - 1,
+          }, SetOptions(merge: true));
+        }
+      });
+    } catch (e) {
+      print('Error releasing image generation: $e');
+    }
+  }
 }

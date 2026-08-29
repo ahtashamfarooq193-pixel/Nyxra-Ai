@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
+  static const int dailyFreeImages = 3;
   // Colors
   static const Color primaryColor = Color(0xFF00D4FF);
   static const Color secondaryColor = Color(0xFF9D4EDD);
@@ -32,6 +33,9 @@ class AppConstants {
   static const Duration shortAnimation = Duration(milliseconds: 200);
   static const Duration mediumAnimation = Duration(milliseconds: 400);
   static const Duration longAnimation = Duration(milliseconds: 600);
+
+  // Free daily token allowance (resets at local midnight)
+  static const int dailyFreeTokens = 5000;
 
   // Spacing
   static const double paddingSmall = 8.0;
